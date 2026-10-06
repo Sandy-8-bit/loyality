@@ -1,236 +1,1412 @@
-'use client';
-import { useState, useEffect, useCallback, type FormEvent } from 'react';
-import Link from 'next/link';
-import QRCode from 'qrcode';
-import { Users, Ticket, Gift, CheckCircle2, ArrowRight, Plus, Copy, Clock3, Search, ChevronLeft, ChevronRight, Download, Printer, Upload, Settings, Sparkles, QrCode, ArrowUpRight, Check, Flower2 } from 'lucide-react';
-import Image from 'next/image';
-import { api, dateLabel } from '@/lib/api-client';
-import type { Overview, LoyaltyCode, Customer, CustomerCard, Reward, Shop } from '@/lib/types';
-import { Brand, RewardVisual, Stamps } from './brand';
-import { Busy, Modal, Notice } from './shared';
-const titles: Record<string, {
+"use client";
+import { useState, useEffect, useCallback, type FormEvent } from "react";
+import Link from "next/link";
+import QRCode from "qrcode";
+import {
+  Users,
+  Ticket,
+  Gift,
+  CheckCircle2,
+  ArrowRight,
+  Plus,
+  Copy,
+  Clock3,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Printer,
+  Upload,
+  Settings,
+  Sparkles,
+  QrCode,
+  ArrowUpRight,
+  Check,
+  Flower2,
+} from "lucide-react";
+import Image from "next/image";
+import { api, dateLabel } from "@/lib/api-client";
+import type {
+  Overview,
+  LoyaltyCode,
+  Customer,
+  CustomerCard,
+  Reward,
+  Shop,
+} from "@/lib/types";
+import { Brand, RewardVisual, Stamps } from "./brand";
+import { Busy, Modal, Notice } from "./shared";
+const titles: Record<
+  string,
+  {
     title: string;
     description: string;
-}> = { dashboard: { title: 'A little loyalty. A lot of love.', description: 'Here’s what’s happening with your regulars.' }, customers: { title: 'Familiar faces, happy customers.', description: 'Every regular has a story. Keep up with theirs.' }, codes: { title: 'One code. A reason to come back.', description: 'Give your customers a stamp after every purchase.' }, reward: { title: 'Make their sixth visit special.', description: 'Choose the little thank you your regulars will love.' }, settings: { title: 'Make yourself at home.', description: 'The small details that make your club yours.' }, qr: { title: 'The start of something regular.', description: 'Put your QR code on the counter. Let the good things begin.' } };
-function isActive(code: LoyaltyCode, now: number) { return !code.revoked && new Date(code.expires_at).getTime() > now && code.created_date === new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now)); }
-function useNow() { const [now, setNow] = useState(() => Date.now()); useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []); return now; }
-function currentCycle(customer: Customer) { return customer.loyalty_cycles?.find(c => c.status !== 'reward_claimed'); }
-export function AdminWorkspace({ section }: {
-    section: string;
-}) {
-    const [data, setData] = useState<Overview>();
-    const [error, setError] = useState('');
-    const [selected, setSelected] = useState<string>();
-    const refresh = useCallback(() => api<Overview>('admin/overview').then(value => { setData(value); setError(''); }).catch((e: Error) => { setError(e.message); }), []);
-    useEffect(() => { void refresh(); const t = setInterval(() => { if (document.visibilityState === 'visible')
-        void refresh(); }, 30000); return () => clearInterval(t); }, [refresh]);
-    const heading = titles[section];
-    return <><div className="page-heading mb-7 flex flex-wrap items-center justify-between gap-5 [&_h1]:mt-1 [&_h1]:text-[26px] [&_h1]:font-medium [&_h1]:leading-tight [&_h1]:tracking-[-0.9px] [&_p]:mt-2.5 [&_p]:text-xs [&_p]:text-muted"><div><span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">{section === 'dashboard' ? 'YOUR REGULARS CLUB' : section === 'reward' ? 'A DELICIOUS THANK YOU' : 'KORA WORKSPACE'}</span><h1>{heading.title}</h1><p>{heading.description}</p></div>{section === 'dashboard' && <Link className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md" href="/admin/codes"><Plus size={17}/> Generate code</Link>}</div><Notice message={error}/>{!data ? <div className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] data-loading flex min-h-52 items-center justify-center text-muted">{error ? <button className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-secondary border border-line bg-white text-ink hover:border-forest/25 hover:bg-sage/30" onClick={refresh}>Try again</button> : <Busy label="Gathering the good stuff"/>}</div> : <>
-  {section === 'dashboard' && <Dashboard data={data} onSelect={setSelected}/>}
-  {section === 'customers' && <Customers onSelect={setSelected}/>}
-  {section === 'codes' && <Codes initial={data.codes} refresh={refresh}/>}
-  {section === 'reward' && <RewardEditor reward={data.reward} refresh={refresh}/>}
-  {section === 'settings' && <SettingsEditor shop={data.shop} refresh={refresh}/>}
-  {section === 'qr' && <QrPanel shop={data.shop}/>}
-  </>}{selected && <CustomerDetails id={selected} onClose={() => setSelected(undefined)} onClaim={refresh}/>}</>;
+  }
+> = {
+  dashboard: {
+    title: "A little loyalty. A lot of love.",
+    description: "Here’s what’s happening with your regulars.",
+  },
+  customers: {
+    title: "Familiar faces, happy customers.",
+    description: "Every regular has a story. Keep up with theirs.",
+  },
+  codes: {
+    title: "One code. A reason to come back.",
+    description: "Give your customers a stamp after every purchase.",
+  },
+  reward: {
+    title: "Make their sixth visit special.",
+    description: "Choose the little thank you your regulars will love.",
+  },
+  settings: {
+    title: "Make yourself at home.",
+    description: "The small details that make your club yours.",
+  },
+  qr: {
+    title: "The start of something regular.",
+    description: "Put your QR code on the counter. Let the good things begin.",
+  },
+};
+function isActive(code: LoyaltyCode, now: number) {
+  return (
+    !code.revoked && !code.used_at && new Date(code.expires_at).getTime() > now
+  );
 }
-function Dashboard({ data, onSelect }: {
-    data: Overview;
-    onSelect: (id: string) => void;
-}) {
-    const now = useNow();
-    const active = data.codes.find(c => isActive(c, now));
-    const totalWeek = data.chart.reduce((s, d) => s + d.visits, 0);
-    const max = Math.max(...data.chart.map(d => d.visits), 4);
-    const stats = [{ label: 'Total customers', value: data.stats.customers, icon: Users, note: 'Part of your regulars club', color: 'green' }, { label: 'Active codes', value: active ? 1 : 0, icon: Ticket, note: active ? 'Ready for the next customer' : 'Generate one to get started', color: 'peach' }, { label: 'Completed cards', value: data.stats.completedCards, icon: CheckCircle2, note: 'Six visits. Six reasons to smile.', color: 'purple' }, { label: 'Rewards enjoyed', value: data.stats.claimedRewards, icon: Gift, note: 'Little thank yous, handed over', color: 'yellow' }];
-    return <><section className="welcome-banner relative mb-6 grid min-h-60 overflow-hidden rounded-2xl border border-[#dee6d5] bg-[#eaf0e1] p-6 sm:p-8 md:grid-cols-[1.2fr_1fr] [&_h2]:mt-4 [&_h2]:text-[27px] [&_h2]:font-medium [&_h2]:leading-[1.35] [&_h2]:tracking-[-0.5px] [&_h2_em]:font-serif [&_h2_em]:font-normal [&_h2_em]:text-[#728769] [&_p]:mt-3 [&_p]:text-xs [&_p]:text-[#77856c] [&_.text-link]:mt-5 [&_.text-link]:!text-[11px]"><div><span className="badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 badge-green bg-[#edf4e9] text-[#4a6a41]"><span className="status-dot inline-block size-1.5 shrink-0 rounded-full bg-[#719162]"/> YOUR CLUB IS OPEN</span><h2>Good food brings them in.<br /><em>A little love brings them back.</em></h2><p>Every stamp is another reason to visit {data.shop.name}.</p><Link href="/admin/qr" className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4">Share your loyalty program <ArrowUpRight size={16}/></Link></div><div className="banner-illustration relative hidden items-center justify-center md:flex"><div className="mini-loyalty-card z-10 w-[245px] rotate-[-10deg] rounded-xl border border-[#d3ddc5] bg-[#fcfcf6] p-5 shadow-[5px_10px_0_#c9d4ba60] [&>div:first-child]:flex [&>div:first-child]:items-center [&>div:first-child]:justify-between [&>div:first-child]:text-forest [&>div:first-child>span]:text-right [&>div:first-child>span]:text-[8px] [&>div:first-child>span]:leading-4 [&>div:first-child>span]:tracking-widest [&>span]:block [&>span]:border-t [&>span]:border-line [&>span]:pt-2 [&>span]:text-[6px] [&>span]:tracking-widest [&>span]:text-muted"><div><Flower2 size={22}/><span>GOOD THINGS<br />COME TO REGULARS</span></div><Stamps count={4} compact/><span>ONE MORE REASON TO COME BACK.</span></div><span className="banner-star absolute text-[#9db18b] star-a -top-2 right-1 text-5xl">✳</span><span className="banner-star absolute text-[#9db18b] star-b bottom-3 left-0 text-3xl">✴</span><span className="banner-seal absolute -bottom-4 right-0 z-20 flex size-[88px] rotate-12 flex-col items-center justify-center rounded-full border border-dashed border-[#bd9b7a] bg-peach text-center text-[9px] leading-5 text-[#8c6241] [&>b]:font-serif [&>b]:text-base [&>b]:font-normal [&>b]:italic">made for<br /><b>our regulars</b></span></div></section>
-  <div className="stats-grid mb-6 grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-5">{stats.map(item => <section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] stat-card p-4 sm:p-5 [&_.section-heading]:text-[11px] [&_.section-heading]:font-medium [&_.section-heading]:text-muted [&>strong]:my-3 [&>strong]:block [&>strong]:text-[31px] [&>strong]:font-medium [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:block [&>small]:text-[9px] [&>small]:leading-4 [&>small]:text-muted/80" key={item.label}><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><span>{item.label}</span><span className={`stat-icon flex size-8 shrink-0 items-center justify-center rounded-lg ${({ green: "bg-[#edf3e8] text-[#6e8b58]", peach: "bg-[#f9eee3] text-[#c4976e]", purple: "bg-[#f0ecf6] text-[#9b89b2]", yellow: "bg-[#f6f1db] text-[#b0a052]" } as Record<string, string>)[item.color]}`}><item.icon size={19}/></span></div><strong>{item.value.toLocaleString('en-IN')}</strong><small>{item.note}</small></section>)}</div>
-  <div className="dashboard-grid mb-6 grid items-stretch gap-5 xl:grid-cols-[1.65fr_1fr]"><section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] visits-panel p-5 sm:p-6"><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><div><h3>Little visits. Lasting connections.</h3><p>Your loyalty check-ins over the last 7 days</p></div><span className="badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 badge-neutral bg-[#f3f4f0] text-[#737b70]">Last 7 days</span></div><div className="chart-summary mb-5 mt-7 flex items-baseline gap-3 [&>strong]:text-3xl [&>strong]:font-medium [&>strong]:tracking-tight [&>span]:text-[10px] [&>span]:text-muted"><strong>{totalWeek}</strong><span>stamps collected this week</span></div><div className="bar-chart relative flex h-40 gap-3 pl-7 sm:gap-5" role="img" aria-label={data.chart.map(d => `${d.day}: ${d.visits} visits`).join(', ')}><div className="chart-grid-lines pointer-events-none absolute inset-0 bottom-7 flex flex-col justify-between [&>span]:relative [&>span]:text-[9px] [&>span]:text-muted/60 [&>span]:after:absolute [&>span]:after:left-7 [&>span]:after:right-0 [&>span]:after:top-1.5 [&>span]:after:border-t [&>span]:after:border-dashed [&>span]:after:border-line"><span>{max}</span><span>{Math.round(max / 2)}</span><span>0</span></div>{data.chart.map((day, i) => <div className="bar-column relative z-10 flex min-w-0 flex-1 flex-col items-center [&>span]:mt-3 [&>span]:text-[9px] [&>span]:text-muted" key={day.day}><div className="bar-track flex h-full w-full max-w-11 items-end justify-center"><div className={`chart-bar relative min-h-[2px] w-full rounded-t-md bg-[#b9caaa] [&>span]:absolute [&>span]:-top-5 [&>span]:left-0 [&>span]:w-full [&>span]:text-center [&>span]:text-[9px] [&>span]:text-muted ${i === 6 ? "chart-bar-today !bg-forest" : ""}`} style={{ height: `${Math.max(day.visits / max * 100, 1)}%` }} title={`${day.visits} visits`}>{day.visits > 0 && <span>{day.visits}</span>}</div></div><span>{new Date(`${day.day}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'short' })}</span></div>)}</div>{totalWeek === 0 && <p className="chart-empty mt-3 text-center text-[10px] text-muted">Your first check-in will start the story.</p>}</section><section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] dashboard-reward p-5 [&>.dish-art]:my-4 [&>.dish-art]:h-36 [&>.dish-art]:rounded-xl [&>.dish-art>.dish-plate]:scale-75 [&>.dish-art>.dish-note]:!text-xs [&>.reward-image]:my-4 [&>.reward-image]:h-36 [&>h3]:mt-1 [&>h3]:text-lg [&>h3]:font-medium [&>p]:mt-1.5 [&>p]:text-[11px] [&>p]:leading-5 [&>p]:text-muted [&>.text-link]:mt-4 [&>.text-link]:!text-[11px]"><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><h3>A little something on us</h3><Gift size={19}/></div><RewardVisual image={data.reward.image_url} name={data.reward.name}/><span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">THE SIXTH-VISIT REWARD</span><h3>{data.reward.name}</h3><p>{data.reward.description}</p><Link href="/admin/reward" className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4">Manage reward <ArrowRight size={15}/></Link></section></div>
-  <div className="dashboard-grid mb-6 grid items-stretch gap-5 xl:grid-cols-[1.65fr_1fr] lower-grid !items-start"><section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] recent-customers overflow-hidden [&>.section-heading]:p-5"><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><div><h3>Your newest regulars</h3><p>A warm welcome to the club.</p></div><Link className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4" href="/admin/customers">View all <ArrowRight size={15}/></Link></div><CustomerTable customers={data.customers} onSelect={onSelect} compact/></section><section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] activity-panel p-5"><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><h3>Around the club</h3><span className="status-dot inline-block size-1.5 shrink-0 rounded-full bg-[#719162]"/></div>{data.activity.length ? data.activity.map(item => <div className="activity-row mt-5 flex items-start gap-3 [&_strong]:text-[11px] [&_strong]:font-medium [&_p]:mt-1 [&_p]:text-[10px] [&_p]:text-muted [&_small]:mt-1 [&_small]:block [&_small]:text-[8px] [&_small]:text-muted/75" key={item.id}><span className="activity-icon mt-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-sage text-[#668454]"><Check size={15}/></span><div><strong>{item.profiles?.name || 'A regular'}</strong><p>Collected stamp {item.checkpoint_number} of 6</p><small>{dateLabel(item.created_at)}</small></div></div>) : <div className="empty-state flex min-h-56 flex-col items-center justify-center gap-3 p-6 text-center [&>svg]:mb-1 [&>svg]:size-8 [&>svg]:text-[#a5b496] [&>h3]:text-sm [&>h3]:font-medium [&>h4]:text-xs [&>h4]:font-medium [&>p]:max-w-xs [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>.text-link]:mt-2 [&>.text-link]:!text-xs small-empty !min-h-44 !p-4"><Sparkles /><h4>The good things start here.</h4><p>Check-ins and happy moments will appear as your club grows.</p></div>}</section></div></>;
+function useNow() {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
 }
-function CustomerTable({ customers, onSelect, compact = false }: {
-    customers: Customer[];
-    onSelect: (id: string) => void;
-    compact?: boolean;
-}) {
-    if (!customers.length)
-        return <div className="empty-state flex min-h-56 flex-col items-center justify-center gap-3 p-6 text-center [&>svg]:mb-1 [&>svg]:size-8 [&>svg]:text-[#a5b496] [&>h3]:text-sm [&>h3]:font-medium [&>h4]:text-xs [&>h4]:font-medium [&>p]:max-w-xs [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>.text-link]:mt-2 [&>.text-link]:!text-xs"><Users /><h3>Your next regular is just a scan away.</h3><p>Share the shop QR code to welcome your first customer.</p><Link href="/admin/qr" className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4">Get your shop QR code <ArrowRight size={15}/></Link></div>;
-    return <div className="table-scroll w-full overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_th]:whitespace-nowrap [&_th]:border-y [&_th]:border-line/80 [&_th]:bg-[#fafbf8] [&_th]:px-5 [&_th]:py-3 [&_th]:text-left [&_th]:text-[9px] [&_th]:font-medium [&_th]:text-muted [&_td]:border-b [&_td]:border-line/60 [&_td]:px-5 [&_td]:py-4 [&_td]:text-[11px] [&_td]:text-muted [&_tbody_tr:last-child_td]:border-0 [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-cream/70"><table><thead><tr><th>Customer</th><th>Loyalty card</th>{!compact && <th>Last visit</th>}<th>Status</th><th><span className="sr-only">View</span></th></tr></thead><tbody>{customers.map((c, i) => { const cycle = currentCycle(c); const count = cycle?.completed_checkpoints || 0; return <tr key={c.id}><td><button className="customer-cell flex items-center gap-3 text-left [&_strong]:block [&_strong]:whitespace-nowrap [&_strong]:text-[11px] [&_strong]:font-medium [&_strong]:text-ink [&_small]:mt-1 [&_small]:block [&_small]:whitespace-nowrap [&_small]:text-[9px] [&_small]:text-muted" onClick={() => onSelect(c.id)}><span className={`avatar flex size-9 shrink-0 items-center justify-center rounded-full bg-[#e8eddf] text-[11px] font-medium text-forest avatar-${i % 4}`}>{(c.name || 'R').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()}</span><span><strong>{c.name || 'New regular'}</strong><small>{c.phone}</small></span></button></td><td><div className="table-progress min-w-20 [&>div]:flex [&>div]:gap-1 [&>div>span]:h-1.5 [&>div>span]:w-3 [&>div>span]:rounded-full [&>div>span]:bg-line [&>div>.filled]:!bg-[#8aa577] [&>small]:mt-2 [&>small]:block [&>small]:text-[9px] [&>small]:text-muted"><div>{Array.from({ length: 6 }, (_, i) => <span className={i < count ? "filled" : ""} key={i}/>)}</div><small>{count}/6 {!compact && `· Card #${cycle?.cycle_number || 1}`}</small></div></td>{!compact && <td className="table-date whitespace-nowrap !text-[10px]">{dateLabel(c.last_visit_at)}</td>}<td><span className={`badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 ${count === 6 ? "badge-peach bg-[#f9ede2] text-[#956236]" : "badge-green bg-[#edf4e9] text-[#4a6a41]"}`}>{count === 6 ? 'Reward ready' : 'Collecting'}</span></td><td><button className="icon-button inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-sage hover:text-forest" aria-label={`View ${c.name || 'customer'}`} onClick={() => onSelect(c.id)}><ChevronRight size={17}/></button></td></tr>; })}</tbody></table></div>;
+function currentCycle(customer: Customer) {
+  return customer.loyalty_cycles?.find((c) => c.status !== "reward_claimed");
 }
-function Customers({ onSelect }: {
-    onSelect: (id: string) => void;
+export function AdminWorkspace({ section }: { section: string }) {
+  const [data, setData] = useState<Overview>();
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState<string>();
+  const refresh = useCallback(
+    () =>
+      api<Overview>("admin/overview")
+        .then((value) => {
+          setData(value);
+          setError("");
+        })
+        .catch((e: Error) => {
+          setError(e.message);
+        }),
+    [],
+  );
+  useEffect(() => {
+    void refresh();
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 30000);
+    return () => clearInterval(t);
+  }, [refresh]);
+  const heading = titles[section];
+  return (
+    <>
+      <div className="page-heading mb-7 flex flex-wrap items-center justify-between gap-5 [&_h1]:mt-1 [&_h1]:text-[26px] [&_h1]:font-medium [&_h1]:leading-tight [&_h1]:tracking-[-0.9px] [&_p]:mt-2.5 [&_p]:text-xs [&_p]:text-muted">
+        <div>
+          <span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">
+            {section === "dashboard"
+              ? "YOUR REGULARS CLUB"
+              : section === "reward"
+                ? "A DELICIOUS THANK YOU"
+                : "KORA WORKSPACE"}
+          </span>
+          <h1>{heading.title}</h1>
+          <p>{heading.description}</p>
+        </div>
+        {section === "dashboard" && (
+          <Link
+            className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md"
+            href="/admin/codes"
+          >
+            <Plus size={17} /> Generate code
+          </Link>
+        )}
+      </div>
+      <Notice message={error} />
+      {!data ? (
+        <div className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] data-loading flex min-h-52 items-center justify-center text-muted">
+          {error ? (
+            <button
+              className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-secondary border border-line bg-white text-ink hover:border-forest/25 hover:bg-sage/30"
+              onClick={refresh}
+            >
+              Try again
+            </button>
+          ) : (
+            <Busy label="Gathering the good stuff" />
+          )}
+        </div>
+      ) : (
+        <>
+          {section === "dashboard" && (
+            <Dashboard data={data} onSelect={setSelected} />
+          )}
+          {section === "customers" && <Customers onSelect={setSelected} />}
+          {section === "codes" && (
+            <CodesV2 initial={data.codes} refresh={refresh} />
+          )}
+          {section === "reward" && (
+            <RewardEditor reward={data.reward} refresh={refresh} />
+          )}
+          {section === "settings" && (
+            <SettingsEditor shop={data.shop} refresh={refresh} />
+          )}
+          {section === "qr" && <QrPanel shop={data.shop} />}
+        </>
+      )}
+      {selected && (
+        <CustomerDetails
+          id={selected}
+          onClose={() => setSelected(undefined)}
+          onClaim={refresh}
+        />
+      )}
+    </>
+  );
+}
+function Dashboard({
+  data,
+  onSelect,
+}: {
+  data: Overview;
+  onSelect: (id: string) => void;
 }) {
-    const [customers, setCustomers] = useState<Customer[]>([]);
-    const [search, setSearch] = useState('');
-    const [page, setPage] = useState(1);
-    const [total, setTotal] = useState(0);
-    const [busy, setBusy] = useState(true);
-    const [error, setError] = useState('');
-    useEffect(() => { let cancelled = false; const t = setTimeout(async () => { setBusy(true); try {
+  const now = useNow();
+  const active = data.codes.find((c) => isActive(c, now));
+  const totalWeek = data.chart.reduce((s, d) => s + d.visits, 0);
+  const max = Math.max(...data.chart.map((d) => d.visits), 4);
+  const stats = [
+    {
+      label: "Total customers",
+      value: data.stats.customers,
+      icon: Users,
+      note: "Part of your regulars club",
+      color: "green",
+    },
+    {
+      label: "Active codes",
+      value: active ? 1 : 0,
+      icon: Ticket,
+      note: active
+        ? "Ready for the next customer"
+        : "Generate one to get started",
+      color: "peach",
+    },
+    {
+      label: "Completed cards",
+      value: data.stats.completedCards,
+      icon: CheckCircle2,
+      note: "Six visits. Six reasons to smile.",
+      color: "purple",
+    },
+    {
+      label: "Rewards enjoyed",
+      value: data.stats.claimedRewards,
+      icon: Gift,
+      note: "Little thank yous, handed over",
+      color: "yellow",
+    },
+  ];
+  return (
+    <>
+      <section className="welcome-banner relative mb-6 grid min-h-60 overflow-hidden rounded-2xl border border-[#dee6d5] bg-[#eaf0e1] p-6 sm:p-8 md:grid-cols-[1.2fr_1fr] [&_h2]:mt-4 [&_h2]:text-[27px] [&_h2]:font-medium [&_h2]:leading-[1.35] [&_h2]:tracking-[-0.5px] [&_h2_em]:font-serif [&_h2_em]:font-normal [&_h2_em]:text-[#728769] [&_p]:mt-3 [&_p]:text-xs [&_p]:text-[#77856c] [&_.text-link]:mt-5 [&_.text-link]:!text-[11px]">
+        <div>
+          <span className="badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 badge-green bg-[#edf4e9] text-[#4a6a41]">
+            <span className="status-dot inline-block size-1.5 shrink-0 rounded-full bg-[#719162]" />{" "}
+            YOUR CLUB IS OPEN
+          </span>
+          <h2>
+            Good food brings them in.
+            <br />
+            <em>A little love brings them back.</em>
+          </h2>
+          <p>Every stamp is another reason to visit {data.shop.name}.</p>
+          <Link
+            href="/admin/qr"
+            className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4"
+          >
+            Share your loyalty program <ArrowUpRight size={16} />
+          </Link>
+        </div>
+        <div className="banner-illustration relative hidden items-center justify-center md:flex">
+          <div className="mini-loyalty-card z-10 w-[245px] rotate-[-10deg] rounded-xl border border-[#d3ddc5] bg-[#fcfcf6] p-5 shadow-[5px_10px_0_#c9d4ba60] [&>div:first-child]:flex [&>div:first-child]:items-center [&>div:first-child]:justify-between [&>div:first-child]:text-forest [&>div:first-child>span]:text-right [&>div:first-child>span]:text-[8px] [&>div:first-child>span]:leading-4 [&>div:first-child>span]:tracking-widest [&>span]:block [&>span]:border-t [&>span]:border-line [&>span]:pt-2 [&>span]:text-[6px] [&>span]:tracking-widest [&>span]:text-muted">
+            <div>
+              <Flower2 size={22} />
+              <span>
+                GOOD THINGS
+                <br />
+                COME TO REGULARS
+              </span>
+            </div>
+            <Stamps count={4} compact />
+            <span>ONE MORE REASON TO COME BACK.</span>
+          </div>
+          <span className="banner-star absolute text-[#9db18b] star-a -top-2 right-1 text-5xl">
+            ✳
+          </span>
+          <span className="banner-star absolute text-[#9db18b] star-b bottom-3 left-0 text-3xl">
+            ✴
+          </span>
+          <span className="banner-seal absolute -bottom-4 right-0 z-20 flex size-[88px] rotate-12 flex-col items-center justify-center rounded-full border border-dashed border-[#bd9b7a] bg-peach text-center text-[9px] leading-5 text-[#8c6241] [&>b]:font-serif [&>b]:text-base [&>b]:font-normal [&>b]:italic">
+            made for
+            <br />
+            <b>our regulars</b>
+          </span>
+        </div>
+      </section>
+      <div className="stats-grid mb-6 grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-5">
+        {stats.map((item) => (
+          <section
+            className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] stat-card p-4 sm:p-5 [&_.section-heading]:text-[11px] [&_.section-heading]:font-medium [&_.section-heading]:text-muted [&>strong]:my-3 [&>strong]:block [&>strong]:text-[31px] [&>strong]:font-medium [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:block [&>small]:text-[9px] [&>small]:leading-4 [&>small]:text-muted/80"
+            key={item.label}
+          >
+            <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+              <span>{item.label}</span>
+              <span
+                className={`stat-icon flex size-8 shrink-0 items-center justify-center rounded-lg ${({ green: "bg-[#edf3e8] text-[#6e8b58]", peach: "bg-[#f9eee3] text-[#c4976e]", purple: "bg-[#f0ecf6] text-[#9b89b2]", yellow: "bg-[#f6f1db] text-[#b0a052]" } as Record<string, string>)[item.color]}`}
+              >
+                <item.icon size={19} />
+              </span>
+            </div>
+            <strong>{item.value.toLocaleString("en-IN")}</strong>
+            <small>{item.note}</small>
+          </section>
+        ))}
+      </div>
+      <div className="dashboard-grid mb-6 grid items-stretch gap-5 xl:grid-cols-[1.65fr_1fr]">
+        <section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] visits-panel p-5 sm:p-6">
+          <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+            <div>
+              <h3>Little visits. Lasting connections.</h3>
+              <p>Your loyalty check-ins over the last 7 days</p>
+            </div>
+            <span className="badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 badge-neutral bg-[#f3f4f0] text-[#737b70]">
+              Last 7 days
+            </span>
+          </div>
+          <div className="chart-summary mb-5 mt-7 flex items-baseline gap-3 [&>strong]:text-3xl [&>strong]:font-medium [&>strong]:tracking-tight [&>span]:text-[10px] [&>span]:text-muted">
+            <strong>{totalWeek}</strong>
+            <span>stamps collected this week</span>
+          </div>
+          <div
+            className="bar-chart relative flex h-40 gap-3 pl-7 sm:gap-5"
+            role="img"
+            aria-label={data.chart
+              .map((d) => `${d.day}: ${d.visits} visits`)
+              .join(", ")}
+          >
+            <div className="chart-grid-lines pointer-events-none absolute inset-0 bottom-7 flex flex-col justify-between [&>span]:relative [&>span]:text-[9px] [&>span]:text-muted/60 [&>span]:after:absolute [&>span]:after:left-7 [&>span]:after:right-0 [&>span]:after:top-1.5 [&>span]:after:border-t [&>span]:after:border-dashed [&>span]:after:border-line">
+              <span>{max}</span>
+              <span>{Math.round(max / 2)}</span>
+              <span>0</span>
+            </div>
+            {data.chart.map((day, i) => (
+              <div
+                className="bar-column relative z-10 flex min-w-0 flex-1 flex-col items-center [&>span]:mt-3 [&>span]:text-[9px] [&>span]:text-muted"
+                key={day.day}
+              >
+                <div className="bar-track flex h-full w-full max-w-11 items-end justify-center">
+                  <div
+                    className={`chart-bar relative min-h-[2px] w-full rounded-t-md bg-[#b9caaa] [&>span]:absolute [&>span]:-top-5 [&>span]:left-0 [&>span]:w-full [&>span]:text-center [&>span]:text-[9px] [&>span]:text-muted ${i === 6 ? "chart-bar-today !bg-forest" : ""}`}
+                    style={{
+                      height: `${Math.max((day.visits / max) * 100, 1)}%`,
+                    }}
+                    title={`${day.visits} visits`}
+                  >
+                    {day.visits > 0 && <span>{day.visits}</span>}
+                  </div>
+                </div>
+                <span>
+                  {new Date(`${day.day}T12:00:00`).toLocaleDateString("en-IN", {
+                    weekday: "short",
+                  })}
+                </span>
+              </div>
+            ))}
+          </div>
+          {totalWeek === 0 && (
+            <p className="chart-empty mt-3 text-center text-[10px] text-muted">
+              Your first check-in will start the story.
+            </p>
+          )}
+        </section>
+        <section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] dashboard-reward p-5 [&>.dish-art]:my-4 [&>.dish-art]:h-36 [&>.dish-art]:rounded-xl [&>.dish-art>.dish-plate]:scale-75 [&>.dish-art>.dish-note]:!text-xs [&>.reward-image]:my-4 [&>.reward-image]:h-36 [&>h3]:mt-1 [&>h3]:text-lg [&>h3]:font-medium [&>p]:mt-1.5 [&>p]:text-[11px] [&>p]:leading-5 [&>p]:text-muted [&>.text-link]:mt-4 [&>.text-link]:!text-[11px]">
+          <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+            <h3>A little something on us</h3>
+            <Gift size={19} />
+          </div>
+          <RewardVisual image={data.reward.image_url} name={data.reward.name} />
+          <span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">
+            THE SIXTH-VISIT REWARD
+          </span>
+          <h3>{data.reward.name}</h3>
+          <p>{data.reward.description}</p>
+          <Link
+            href="/admin/reward"
+            className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4"
+          >
+            Manage reward <ArrowRight size={15} />
+          </Link>
+        </section>
+      </div>
+      <div className="dashboard-grid mb-6 grid items-stretch gap-5 xl:grid-cols-[1.65fr_1fr] lower-grid !items-start">
+        <section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] recent-customers overflow-hidden [&>.section-heading]:p-5">
+          <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+            <div>
+              <h3>Your newest regulars</h3>
+              <p>A warm welcome to the club.</p>
+            </div>
+            <Link
+              className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4"
+              href="/admin/customers"
+            >
+              View all <ArrowRight size={15} />
+            </Link>
+          </div>
+          <CustomerTable
+            customers={data.customers}
+            onSelect={onSelect}
+            compact
+          />
+        </section>
+        <section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] activity-panel p-5">
+          <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+            <h3>Around the club</h3>
+            <span className="status-dot inline-block size-1.5 shrink-0 rounded-full bg-[#719162]" />
+          </div>
+          {data.activity.length ? (
+            data.activity.map((item) => (
+              <div
+                className="activity-row mt-5 flex items-start gap-3 [&_strong]:text-[11px] [&_strong]:font-medium [&_p]:mt-1 [&_p]:text-[10px] [&_p]:text-muted [&_small]:mt-1 [&_small]:block [&_small]:text-[8px] [&_small]:text-muted/75"
+                key={item.id}
+              >
+                <span className="activity-icon mt-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-sage text-[#668454]">
+                  <Check size={15} />
+                </span>
+                <div>
+                  <strong>{item.profiles?.name || "A regular"}</strong>
+                  <p>Collected stamp {item.checkpoint_number} of 6</p>
+                  <small>{dateLabel(item.created_at)}</small>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="empty-state flex min-h-56 flex-col items-center justify-center gap-3 p-6 text-center [&>svg]:mb-1 [&>svg]:size-8 [&>svg]:text-[#a5b496] [&>h3]:text-sm [&>h3]:font-medium [&>h4]:text-xs [&>h4]:font-medium [&>p]:max-w-xs [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>.text-link]:mt-2 [&>.text-link]:!text-xs small-empty !min-h-44 !p-4">
+              <Sparkles />
+              <h4>The good things start here.</h4>
+              <p>Check-ins and happy moments will appear as your club grows.</p>
+            </div>
+          )}
+        </section>
+      </div>
+    </>
+  );
+}
+function CustomerTable({
+  customers,
+  onSelect,
+  compact = false,
+}: {
+  customers: Customer[];
+  onSelect: (id: string) => void;
+  compact?: boolean;
+}) {
+  if (!customers.length)
+    return (
+      <div className="empty-state flex min-h-56 flex-col items-center justify-center gap-3 p-6 text-center [&>svg]:mb-1 [&>svg]:size-8 [&>svg]:text-[#a5b496] [&>h3]:text-sm [&>h3]:font-medium [&>h4]:text-xs [&>h4]:font-medium [&>p]:max-w-xs [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>.text-link]:mt-2 [&>.text-link]:!text-xs">
+        <Users />
+        <h3>Your next regular is just a scan away.</h3>
+        <p>Share the shop QR code to welcome your first customer.</p>
+        <Link
+          href="/admin/qr"
+          className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4"
+        >
+          Get your shop QR code <ArrowRight size={15} />
+        </Link>
+      </div>
+    );
+  return (
+    <div className="table-scroll w-full overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_th]:whitespace-nowrap [&_th]:border-y [&_th]:border-line/80 [&_th]:bg-[#fafbf8] [&_th]:px-5 [&_th]:py-3 [&_th]:text-left [&_th]:text-[9px] [&_th]:font-medium [&_th]:text-muted [&_td]:border-b [&_td]:border-line/60 [&_td]:px-5 [&_td]:py-4 [&_td]:text-[11px] [&_td]:text-muted [&_tbody_tr:last-child_td]:border-0 [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-cream/70">
+      <table>
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Loyalty card</th>
+            {!compact && <th>Last visit</th>}
+            <th>Status</th>
+            <th>
+              <span className="sr-only">View</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {customers.map((c, i) => {
+            const cycle = currentCycle(c);
+            const count = cycle?.completed_checkpoints || 0;
+            return (
+              <tr key={c.id}>
+                <td>
+                  <button
+                    className="customer-cell flex items-center gap-3 text-left [&_strong]:block [&_strong]:whitespace-nowrap [&_strong]:text-[11px] [&_strong]:font-medium [&_strong]:text-ink [&_small]:mt-1 [&_small]:block [&_small]:whitespace-nowrap [&_small]:text-[9px] [&_small]:text-muted"
+                    onClick={() => onSelect(c.id)}
+                  >
+                    <span
+                      className={`avatar flex size-9 shrink-0 items-center justify-center rounded-full bg-[#e8eddf] text-[11px] font-medium text-forest avatar-${i % 4}`}
+                    >
+                      {(c.name || "R")
+                        .split(" ")
+                        .map((s) => s[0])
+                        .slice(0, 2)
+                        .join("")
+                        .toUpperCase()}
+                    </span>
+                    <span>
+                      <strong>{c.name || "New regular"}</strong>
+                      <small>{c.phone}</small>
+                    </span>
+                  </button>
+                </td>
+                <td>
+                  <div className="table-progress min-w-20 [&>div]:flex [&>div]:gap-1 [&>div>span]:h-1.5 [&>div>span]:w-3 [&>div>span]:rounded-full [&>div>span]:bg-line [&>div>.filled]:!bg-[#8aa577] [&>small]:mt-2 [&>small]:block [&>small]:text-[9px] [&>small]:text-muted">
+                    <div>
+                      {Array.from({ length: 6 }, (_, i) => (
+                        <span className={i < count ? "filled" : ""} key={i} />
+                      ))}
+                    </div>
+                    <small>
+                      {count}/6{" "}
+                      {!compact && `· Card #${cycle?.cycle_number || 1}`}
+                    </small>
+                  </div>
+                </td>
+                {!compact && (
+                  <td className="table-date whitespace-nowrap !text-[10px]">
+                    {dateLabel(c.last_visit_at)}
+                  </td>
+                )}
+                <td>
+                  <span
+                    className={`badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 ${count === 6 ? "badge-peach bg-[#f9ede2] text-[#956236]" : "badge-green bg-[#edf4e9] text-[#4a6a41]"}`}
+                  >
+                    {count === 6 ? "Reward ready" : "Collecting"}
+                  </span>
+                </td>
+                <td>
+                  <button
+                    className="icon-button inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-sage hover:text-forest"
+                    aria-label={`View ${c.name || "customer"}`}
+                    onClick={() => onSelect(c.id)}
+                  >
+                    <ChevronRight size={17} />
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+function Customers({ onSelect }: { onSelect: (id: string) => void }) {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [busy, setBusy] = useState(true);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setBusy(true);
+      try {
         const d = await api<{
-            customers: Customer[];
-            total: number;
+          customers: Customer[];
+          total: number;
         }>(`admin/customers?search=${encodeURIComponent(search)}&page=${page}`);
         if (!cancelled) {
-            setCustomers(d.customers);
-            setTotal(d.total);
-            setError('');
+          setCustomers(d.customers);
+          setTotal(d.total);
+          setError("");
         }
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message);
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [search, page]);
+  return (
+    <section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] customers-panel overflow-hidden [&>.section-heading]:flex-wrap [&>.section-heading]:p-5">
+      <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+        <div>
+          <h3>
+            All customers{" "}
+            <span className="count-pill ml-1.5 rounded-full bg-sage px-2 py-0.5 text-[10px] text-forest">
+              {total}
+            </span>
+          </h3>
+          <p>Your people. Their progress.</p>
+        </div>
+        <div className="search-input flex min-w-0 items-center gap-2 rounded-lg border border-line px-3 focus-within:border-forest [&>svg]:shrink-0 [&>svg]:text-muted [&>input]:!mt-0 [&>input]:!border-0 [&>input]:!bg-transparent [&>input]:!px-0 [&>input]:!py-2.5 [&>input]:!text-xs [&>input]:!ring-0">
+          <Search size={17} />
+          <input
+            placeholder="Search name or mobile…"
+            aria-label="Search customers"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+      </div>
+      <Notice message={error} />
+      {busy ? (
+        <div className="data-loading flex min-h-52 items-center justify-center text-muted">
+          <Busy label="Finding your regulars" />
+        </div>
+      ) : customers.length === 0 && search ? (
+        <div className="empty-state flex min-h-56 flex-col items-center justify-center gap-3 p-6 text-center [&>svg]:mb-1 [&>svg]:size-8 [&>svg]:text-[#a5b496] [&>h3]:text-sm [&>h3]:font-medium [&>h4]:text-xs [&>h4]:font-medium [&>p]:max-w-xs [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>.text-link]:mt-2 [&>.text-link]:!text-xs">
+          <Search />
+          <h3>No regulars found.</h3>
+          <p>Try another name or mobile number.</p>
+        </div>
+      ) : (
+        <CustomerTable customers={customers} onSelect={onSelect} />
+      )}
+      <div className="table-footer flex items-center justify-between gap-3 border-t border-line px-5 py-3 text-[10px] text-muted [&>div]:flex [&>div]:items-center [&>div]:gap-2">
+        <span>
+          {total
+            ? `${(page - 1) * 20 + 1}–${Math.min(page * 20, total)} of ${total} customers`
+            : "No customers yet"}
+        </span>
+        <div>
+          <button
+            className="icon-button inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-sage hover:text-forest"
+            disabled={page === 1 || busy}
+            onClick={() => setPage(page - 1)}
+            aria-label="Previous page"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <span>Page {page}</span>
+          <button
+            className="icon-button inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-sage hover:text-forest"
+            disabled={page * 20 >= total || busy}
+            onClick={() => setPage(page + 1)}
+            aria-label="Next page"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+function CustomerDetails({
+  id,
+  onClose,
+  onClaim,
+}: {
+  id: string;
+  onClose: () => void;
+  onClaim: () => Promise<void>;
+}) {
+  const [data, setData] = useState<CustomerCard>();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const [message, setMessage] = useState("");
+  const load = useCallback(
+    () =>
+      api<CustomerCard>(`admin/customers/${id}`)
+        .then(setData)
+        .catch((e: Error) => {
+          setError(e.message);
+        }),
+    [id],
+  );
+  useEffect(() => {
+    void load();
+  }, [load]);
+  const cycle = data?.cycles.find((c) => c.status !== "reward_claimed");
+  async function claim() {
+    if (!cycle) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api("admin/claim", {
+        method: "POST",
+        body: JSON.stringify({ cycleId: cycle.id }),
+      });
+      setConfirm(false);
+      setMessage("Reward marked as served. A fresh card is ready.");
+      await load();
+      await onClaim();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
     }
-    catch (e) {
+  }
+  return (
+    <Modal title={data?.profile.name || "Customer details"} onClose={onClose}>
+      <Notice message={error} />
+      <Notice message={message} success />
+      {!data ? (
+        <Busy />
+      ) : (
+        <>
+          <p className="modal-subtitle mb-6 mt-1 text-xs leading-5 text-muted">
+            {data.profile.phone} · Joined {dateLabel(data.profile.created_at)}
+          </p>
+          <div className="detail-card my-5 rounded-xl border border-[#dae3d1] bg-[#edf2e5] px-5 pt-5 [&>.stamps]:mb-4">
+            <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+              <h3>Card #{cycle?.cycle_number}</h3>
+              <span>{cycle?.completed_checkpoints || 0} / 6 stamps</span>
+            </div>
+            <Stamps count={cycle?.completed_checkpoints || 0} />
+          </div>
+          {cycle?.status === "completed" && (
+            <div className="claim-panel flex flex-col items-start gap-3 rounded-xl border border-[#ecd7c5] bg-[#fff7ee] p-5 [&>svg]:text-[#b48a64] [&>h3]:font-medium [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted">
+              <Gift />
+              <h3>{cycle.reward_name}</h3>
+              <p>
+                {confirm
+                  ? "Confirm the customer has received this dish. Their next card will start at zero."
+                  : "This regular has earned their reward. Confirm once the dish has been served."}
+              </p>
+              {confirm ? (
+                <div className="button-row flex flex-wrap items-center gap-3">
+                  <button
+                    className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md"
+                    onClick={claim}
+                    disabled={busy}
+                  >
+                    {busy ? <Busy /> : "Yes, the reward was served"}
+                  </button>
+                  <button
+                    className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-secondary border border-line bg-white text-ink hover:border-forest/25 hover:bg-sage/30"
+                    onClick={() => setConfirm(false)}
+                    disabled={busy}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md"
+                  onClick={() => setConfirm(true)}
+                >
+                  Mark reward as served
+                </button>
+              )}
+            </div>
+          )}
+          <h3 className="detail-heading mb-2 mt-6 text-[13px] font-semibold">
+            Loyalty history
+          </h3>
+          {data.cycles.map((c) => (
+            <div
+              className="history-cycle flex flex-wrap items-center justify-between gap-3 border-b border-line/70 py-3 text-xs last:border-0 [&>strong]:font-medium [&>small]:text-muted"
+              key={c.id}
+            >
+              <strong>Card #{c.cycle_number}</strong>
+              <span>{c.completed_checkpoints}/6 stamps</span>
+              <span
+                className={`badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 ${c.status === "reward_claimed" ? "badge-green bg-[#edf4e9] text-[#4a6a41]" : "badge-neutral bg-[#f3f4f0] text-[#737b70]"}`}
+              >
+                {c.status === "reward_claimed"
+                  ? "Reward enjoyed"
+                  : c.status === "completed"
+                    ? "Reward ready"
+                    : "In progress"}
+              </span>
+            </div>
+          ))}
+          <h3 className="detail-heading mb-2 mt-6 text-[13px] font-semibold">
+            Recent visits
+          </h3>
+          {data.checkins.length ? (
+            data.checkins.slice(0, 12).map((c) => (
+              <div
+                key={c.id}
+                className="history-cycle flex flex-wrap items-center justify-between gap-3 border-b border-line/70 py-3 text-xs last:border-0 [&>strong]:font-medium [&>small]:text-muted"
+              >
+                <span>Stamp {c.checkpoint_number}</span>
+                <small>{dateLabel(c.created_at)}</small>
+              </div>
+            ))
+          ) : (
+            <p className="muted text-sm leading-6 text-muted">
+              No visits yet. The first one is always special.
+            </p>
+          )}
+        </>
+      )}
+    </Modal>
+  );
+}
+function Codes({
+  initial,
+  refresh,
+}: {
+  initial: LoyaltyCode[];
+  refresh: () => Promise<void>;
+}) {
+  const [codes, setCodes] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const now = useNow();
+  const active = codes.find((c) => isActive(c, now));
+  const seconds = active
+    ? Math.max(0, Math.ceil((Date.parse(active.expires_at) - now) / 1000))
+    : 0;
+  useEffect(() => {
+    api<LoyaltyCode[]>("admin/codes")
+      .then(setCodes)
+      .catch((e) => setError(e.message));
+  }, [initial]);
+  async function generate() {
+    setBusy(true);
+    setError("");
+    setCopied(false);
+    try {
+      await api("admin/codes", { method: "POST" });
+      setCodes(await api<LoyaltyCode[]>("admin/codes"));
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(active!.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError(
+        "Copy is unavailable. You can select the code and copy it manually.",
+      );
+    }
+  }
+  return (
+    <>
+      <div className="codes-grid mb-7 grid items-start gap-8 md:grid-cols-2 xl:gap-14">
+        <section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] code-generator p-6 sm:p-8 [&>h2]:mt-7 [&>h2]:text-2xl [&>h2]:font-medium [&>h2]:tracking-tight [&>p]:mt-3 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>small]:mt-4 [&>small]:block [&>small]:text-center [&>small]:text-[10px] [&>small]:text-muted">
+          <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+            <span className="soft-icon inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-sage text-forest">
+              <Ticket />
+            </span>
+            <span
+              className={`badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 ${active ? "badge-green bg-[#edf4e9] text-[#4a6a41]" : "badge-neutral bg-[#f3f4f0] text-[#737b70]"}`}
+            >
+              <span className="status-dot inline-block size-1.5 shrink-0 rounded-full bg-[#719162]" />
+              {active ? "LIVE CODE" : "READY WHEN YOU ARE"}
+            </span>
+          </div>
+          <h2>
+            {active
+              ? "A stamp for their next visit."
+              : "Make their visit count."}
+          </h2>
+          <p>
+            {active
+              ? "Share this code after a purchase. Each customer can use it once."
+              : "Generate a code and share it with customers after their purchase."}
+          </p>
+          <Notice message={error} />
+          <div
+            className={`generated-code my-8 rounded-xl border border-dashed border-forest/20 bg-[#f4f7ee] py-8 text-center font-mono text-[clamp(2rem,4vw,3rem)] font-medium tracking-[0.14em] text-forest ${!active ? "code-placeholder !text-forest/20" : ""}`}
+          >
+            {active?.code || "••••••"}
+          </div>
+          {active && (
+            <div className="code-countdown mb-4 flex items-center justify-center gap-2 text-xs text-muted [&>strong]:font-mono [&>strong]:text-forest">
+              <Clock3 size={18} /> Expires in{" "}
+              <strong>
+                {String(Math.floor(seconds / 60)).padStart(2, "0")}:
+                {String(seconds % 60).padStart(2, "0")}
+              </strong>
+            </div>
+          )}
+          <div className="countdown-track mb-5 h-1 overflow-hidden rounded-full bg-line [&>span]:block [&>span]:h-full [&>span]:rounded-full [&>span]:bg-[#a6bd8f] [&>span]:transition-all">
+            <span style={{ width: `${(seconds / 300) * 100}%` }} />
+          </div>
+          {active ? (
+            <button
+              className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md button-full w-full"
+              onClick={copy}
+            >
+              {copied ? <Check size={18} /> : <Copy size={18} />}{" "}
+              {copied ? "Copied to clipboard" : "Copy code"}
+            </button>
+          ) : (
+            <button
+              className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md button-full w-full"
+              onClick={generate}
+              disabled={busy}
+            >
+              {busy ? (
+                <Busy label="Generating" />
+              ) : (
+                <>
+                  <Plus size={18} /> Generate a new code
+                </>
+              )}
+            </button>
+          )}
+          <small>
+            {active
+              ? "A new code can be generated after this one expires."
+              : "Every code is valid for exactly five minutes."}
+          </small>
+        </section>
+        <section className="code-how py-5 [&>h2]:mb-8 [&>h2]:mt-3 [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:leading-tight [&>h2]:tracking-tight">
+          <span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">
+            A SMALL GESTURE, A HAPPY REGULAR
+          </span>
+          <h2>
+            From a meal
+            <br />
+            to a little milestone.
+          </h2>
+          {[
+            {
+              n: "01",
+              title: "Generate a code",
+              text: "Your unique code stays active for five minutes.",
+            },
+            {
+              n: "02",
+              title: "Share after a purchase",
+              text: "Multiple customers can use the same active code.",
+            },
+            {
+              n: "03",
+              title: "Watch their card grow",
+              text: "One use, one stamp. The sixth unlocks their reward.",
+            },
+          ].map((item) => (
+            <div
+              className="code-step mb-7 flex items-start gap-4 [&>span]:flex [&>span]:size-8 [&>span]:shrink-0 [&>span]:items-center [&>span]:justify-center [&>span]:rounded-full [&>span]:border [&>span]:border-[#dce4d3] [&>span]:bg-sage/50 [&>span]:font-mono [&>span]:text-[10px] [&>span]:text-forest [&_h3]:text-sm [&_h3]:font-medium [&_p]:mt-1.5 [&_p]:text-xs [&_p]:leading-6 [&_p]:text-muted"
+              key={item.n}
+            >
+              <span>{item.n}</span>
+              <div>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </div>
+            </div>
+          ))}
+        </section>
+      </div>
+      <section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] code-history overflow-hidden [&>.section-heading]:p-5">
+        <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+          <div>
+            <h3>Your recent codes</h3>
+            <p>A little history of every invitation back.</p>
+          </div>
+          <Clock3 size={20} />
+        </div>
+        {!codes.length ? (
+          <div className="empty-state flex min-h-56 flex-col items-center justify-center gap-3 p-6 text-center [&>svg]:mb-1 [&>svg]:size-8 [&>svg]:text-[#a5b496] [&>h3]:text-sm [&>h3]:font-medium [&>h4]:text-xs [&>h4]:font-medium [&>p]:max-w-xs [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>.text-link]:mt-2 [&>.text-link]:!text-xs">
+            <Ticket />
+            <p>Your first code will appear here.</p>
+          </div>
+        ) : (
+          <div className="table-scroll w-full overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_th]:whitespace-nowrap [&_th]:border-y [&_th]:border-line/80 [&_th]:bg-[#fafbf8] [&_th]:px-5 [&_th]:py-3 [&_th]:text-left [&_th]:text-[9px] [&_th]:font-medium [&_th]:text-muted [&_td]:border-b [&_td]:border-line/60 [&_td]:px-5 [&_td]:py-4 [&_td]:text-[11px] [&_td]:text-muted [&_tbody_tr:last-child_td]:border-0 [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-cream/70">
+            <table>
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Created</th>
+                  <th>Expires</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {codes.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <strong className="mono font-mono tracking-wider">
+                        {c.code}
+                      </strong>
+                    </td>
+                    <td>{dateLabel(c.created_at)}</td>
+                    <td>{dateLabel(c.expires_at)}</td>
+                    <td>
+                      <span
+                        className={`badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 ${isActive(c, now) ? "badge-green bg-[#edf4e9] text-[#4a6a41]" : "badge-neutral bg-[#f3f4f0] text-[#737b70]"}`}
+                      >
+                        {isActive(c, now) ? "Active" : "Expired"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+function CodesV2({ initial, refresh }: { initial: LoyaltyCode[]; refresh: () => Promise<void> }) {
+  const [codes, setCodes] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const now = useNow();
+  const active = codes.filter((code) => isActive(code, now));
+  useEffect(() => { setCodes(initial); }, [initial]);
+  async function generate() {
+    setBusy(true); setError("");
+    try { await api("admin/codes", { method: "POST" }); setCodes(await api<LoyaltyCode[]>("admin/codes")); await refresh(); }
+    catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
+  }
+  return <section className="panel min-w-0 rounded-2xl border border-line bg-white p-6 shadow-[0_3px_12px_-10px_#1b392930] sm:p-8"><div className="flex items-start justify-between gap-4"><div><h2 className="text-2xl font-medium">Generate loyalty codes</h2><p className="mt-2 text-xs leading-6 text-muted">Generate multiple codes at once. Each expires after 30 minutes or one successful use.</p></div><span className="rounded-full bg-sage px-3 py-2 text-[10px] font-medium text-forest">{active.length} active</span></div><Notice message={error}/><button className="button button-primary mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-forest px-5 py-3 text-[13px] text-white disabled:opacity-60" onClick={generate} disabled={busy}>{busy ? <Busy label="Generating"/> : <><Plus size={18}/> Generate a new code</>}</button><div className="mt-7 overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b border-line text-muted"><th className="p-3">Code</th><th className="p-3">Expires</th><th className="p-3">Status</th></tr></thead><tbody>{codes.map((code) => <tr className="border-b border-line/60" key={code.id}><td className="p-3 font-mono font-medium tracking-wider">{code.code}</td><td className="p-3 text-muted">{dateLabel(code.expires_at)}</td><td className="p-3">{isActive(code, now) ? "Active" : code.used_at ? "Used" : "Expired"}</td></tr>)}</tbody></table></div><p className="mt-4 text-xs text-muted">Codes are automatically removed 10 days after they are generated.</p></section>;
+}
+function RewardEditor({
+  reward,
+  refresh,
+}: {
+  reward: Reward;
+  refresh: () => Promise<void>;
+}) {
+  const [name, setName] = useState(reward.name);
+  const [description, setDescription] = useState(reward.description);
+  const [image, setImage] = useState(reward.image_url);
+  const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  async function upload(file?: File) {
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    setMessage("");
+    try {
+      const form = new FormData();
+      form.append("image", file);
+      const data = await api<{
+        image_url: string;
+      }>("admin/reward/image", { method: "POST", body: form });
+      setImage(data.image_url);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await api("admin/reward", {
+        method: "PUT",
+        body: JSON.stringify({ name, description, image_url: image }),
+      });
+      setMessage(
+        "Your reward is saved. Your regulars have something to look forward to.",
+      );
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="editor-grid grid items-start gap-8 xl:grid-cols-[1.2fr_1fr]">
+      <form
+        className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] editor-form p-6 sm:p-8 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>h3]:text-base [&>h3]:font-medium [&>button]:self-start form-stack flex flex-col gap-5"
+        onSubmit={save}
+      >
+        <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+          <h3>The sixth-visit reward</h3>
+          <Gift size={20} />
+        </div>
+        <p>Something delicious. Something worth coming back for.</p>
+        <Notice message={error} />
+        <Notice message={message} success />
+        <label>
+          Reward name
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            minLength={2}
+            maxLength={80}
+            placeholder="e.g. Chicken noodles"
+          />
+        </label>
+        <label>
+          A little description{" "}
+          <span className="optional ml-1 text-[10px] font-normal text-muted">
+            Optional
+          </span>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={240}
+            rows={3}
+            placeholder="Tell your regulars what makes it special."
+          />
+        </label>
+        <label>
+          Reward photo
+          <div className="upload-zone relative mt-2 flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#cfd8c6] bg-[#f8faf4] p-4 text-center [&>svg]:text-[#8a9c79] [&>strong]:text-xs [&>strong]:font-medium [&>span]:text-[10px] [&>span]:font-normal [&>span]:text-muted [&>input]:absolute [&>input]:inset-0 [&>input]:h-full [&>input]:w-full [&>input]:cursor-pointer [&>input]:opacity-0 focus-within:ring-2 focus-within:ring-forest">
+            <Upload size={25} />
+            <strong>
+              {uploading
+                ? "Uploading your photo…"
+                : "Drop in a little deliciousness"}
+            </strong>
+            <span>Choose a JPG, PNG or WebP · Up to 5 MB</span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              aria-label="Upload reward image"
+              disabled={uploading}
+              onChange={(e) => void upload(e.target.files?.[0])}
+            />
+          </div>
+        </label>
+        {image && (
+          <button
+            type="button"
+            className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4"
+            onClick={() => setImage(null)}
+          >
+            Remove photo
+          </button>
+        )}
+        <div className="editor-note flex items-start gap-2.5 rounded-xl bg-[#f2f5ed] p-4 [&>svg]:mt-0.5 [&>svg]:shrink-0 [&>svg]:text-[#7f946e] [&>p]:text-[11px] [&>p]:font-normal [&>p]:leading-6 [&>p]:text-muted [&_a]:text-forest [&_a]:underline">
+          <CheckCircle2 size={18} />
+          <p>
+            Already-earned rewards keep their original dish. Changes apply to
+            future completed cards.
+          </p>
+        </div>
+        <button
+          className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md"
+          disabled={busy || uploading}
+        >
+          {busy ? (
+            <Busy label="Saving" />
+          ) : (
+            <>
+              Save reward <Check size={17} />
+            </>
+          )}
+        </button>
+      </form>
+      <aside className="reward-preview mx-auto w-full max-w-md [&>p]:mb-5 [&>p]:mt-1 [&>p]:text-xs [&>p]:text-muted [&>.member-reward]:p-6">
+        <span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">
+          A LITTLE PREVIEW
+        </span>
+        <p>Here’s how your regulars will see it.</p>
+        <div className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] member-reward overflow-hidden p-5 [&>.dish-art]:my-5 [&>.dish-art]:rounded-xl [&>.reward-image]:my-5 [&>h2]:mt-3 [&>h2]:text-2xl [&>h2]:font-medium [&>h2]:tracking-tight [&>p]:mt-2 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted">
+          <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+            <span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">
+              YOUR SIXTH VISIT IS ON US
+            </span>
+            <Gift size={18} />
+          </div>
+          <RewardVisual image={image} name={name} />
+          <span className="badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 badge-peach bg-[#f9ede2] text-[#956236]">
+            MADE FOR OUR REGULARS
+          </span>
+          <h2>{name || "Your next delicious reward"}</h2>
+          <p>{description || "Six visits. One lovely thank you."}</p>
+          <div className="preview-stamps mt-5 border-t border-line pt-2">
+            <Stamps count={6} compact />
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+function SettingsEditor({
+  shop,
+  refresh,
+}: {
+  shop: Shop;
+  refresh: () => Promise<void>;
+}) {
+  const [name, setName] = useState(shop.name);
+  const [tagline, setTagline] = useState(shop.tagline);
+  const [url, setUrl] = useState(shop.website_url || "");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await api("admin/settings", {
+        method: "PUT",
+        body: JSON.stringify({ name, tagline, website_url: url }),
+      });
+      setMessage(
+        "Shop details saved. Refresh the page to update the navigation.",
+      );
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function changePassword(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await api("admin/password", {
+        method: "PUT",
+        body: JSON.stringify({ currentPassword, password }),
+      });
+      setPassword("");
+      setCurrentPassword("");
+      setMessage("Your password has been updated.");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="settings-content max-w-2xl space-y-6">
+      <Notice message={error} />
+      <Notice message={message} success />
+      <form
+        className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] editor-form p-6 sm:p-8 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>h3]:text-base [&>h3]:font-medium [&>button]:self-start form-stack flex flex-col gap-5"
+        onSubmit={save}
+      >
+        <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+          <h3>Your shop</h3>
+          <Settings size={20} />
+        </div>
+        <label>
+          Shop name
+          <input
+            required
+            minLength={2}
+            maxLength={60}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+        <label>
+          Tagline
+          <input
+            maxLength={100}
+            value={tagline}
+            onChange={(e) => setTagline(e.target.value)}
+          />
+        </label>
+        <label>
+          Published website address{" "}
+          <span className="optional ml-1 text-[10px] font-normal text-muted">
+            For your shop QR code
+          </span>
+          <input
+            type="url"
+            value={url}
+            placeholder="https://your-shop.com"
+            onChange={(e) => setUrl(e.target.value)}
+          />
+        </label>
+        <p className="field-help -mt-2 text-xs leading-5 text-muted">
+          Set this to your live HTTPS website before printing your shop QR code.
+        </p>
+        <button
+          className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md"
+          disabled={busy}
+        >
+          {busy ? <Busy /> : "Save shop details"}
+        </button>
+      </form>
+      <form
+        className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] editor-form p-6 sm:p-8 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>h3]:text-base [&>h3]:font-medium [&>button]:self-start form-stack flex flex-col gap-5"
+        onSubmit={changePassword}
+      >
+        <h3>Keep your corner secure</h3>
+        <label>
+          Current password
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            required
+          />
+        </label>
+        <label>
+          New password
+          <input
+            type="password"
+            autoComplete="new-password"
+            minLength={12}
+            maxLength={128}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </label>
+        <p className="field-help -mt-2 text-xs leading-5 text-muted">
+          Use at least 12 characters. A few unexpected words work well.
+        </p>
+        <button
+          className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-secondary border border-line bg-white text-ink hover:border-forest/25 hover:bg-sage/30"
+          disabled={busy}
+        >
+          Update password
+        </button>
+      </form>
+    </div>
+  );
+}
+function QrPanel({ shop }: { shop: Shop }) {
+  const [image, setImage] = useState("");
+  const [url, setUrl] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    const target = new URL(
+      "/loyalty",
+      shop.website_url || window.location.origin,
+    ).href;
+    let cancelled = false;
+    QRCode.toDataURL(target, {
+      width: 600,
+      margin: 3,
+      color: { dark: "#254e3d", light: "#ffffff" },
+      errorCorrectionLevel: "H",
+    })
+      .then((value) => {
+        if (!cancelled) {
+          setImage(value);
+          setUrl(target);
+        }
+      })
+      .catch(() => {
         if (!cancelled)
-            setError((e as Error).message);
-    }
-    finally {
-        if (!cancelled)
-            setBusy(false);
-    } }, 250); return () => { cancelled = true; clearTimeout(t); }; }, [search, page]);
-    return <section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] customers-panel overflow-hidden [&>.section-heading]:flex-wrap [&>.section-heading]:p-5"><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><div><h3>All customers <span className="count-pill ml-1.5 rounded-full bg-sage px-2 py-0.5 text-[10px] text-forest">{total}</span></h3><p>Your people. Their progress.</p></div><div className="search-input flex min-w-0 items-center gap-2 rounded-lg border border-line px-3 focus-within:border-forest [&>svg]:shrink-0 [&>svg]:text-muted [&>input]:!mt-0 [&>input]:!border-0 [&>input]:!bg-transparent [&>input]:!px-0 [&>input]:!py-2.5 [&>input]:!text-xs [&>input]:!ring-0"><Search size={17}/><input placeholder="Search name or mobile…" aria-label="Search customers" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}/></div></div><Notice message={error}/>{busy ? <div className="data-loading flex min-h-52 items-center justify-center text-muted"><Busy label="Finding your regulars"/></div> : customers.length === 0 && search ? <div className="empty-state flex min-h-56 flex-col items-center justify-center gap-3 p-6 text-center [&>svg]:mb-1 [&>svg]:size-8 [&>svg]:text-[#a5b496] [&>h3]:text-sm [&>h3]:font-medium [&>h4]:text-xs [&>h4]:font-medium [&>p]:max-w-xs [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>.text-link]:mt-2 [&>.text-link]:!text-xs"><Search /><h3>No regulars found.</h3><p>Try another name or mobile number.</p></div> : <CustomerTable customers={customers} onSelect={onSelect}/>}<div className="table-footer flex items-center justify-between gap-3 border-t border-line px-5 py-3 text-[10px] text-muted [&>div]:flex [&>div]:items-center [&>div]:gap-2"><span>{total ? `${(page - 1) * 20 + 1}–${Math.min(page * 20, total)} of ${total} customers` : 'No customers yet'}</span><div><button className="icon-button inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-sage hover:text-forest" disabled={page === 1 || busy} onClick={() => setPage(page - 1)} aria-label="Previous page"><ChevronLeft size={18}/></button><span>Page {page}</span><button className="icon-button inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-sage hover:text-forest" disabled={page * 20 >= total || busy} onClick={() => setPage(page + 1)} aria-label="Next page"><ChevronRight size={18}/></button></div></div></section>;
-}
-function CustomerDetails({ id, onClose, onClaim }: {
-    id: string;
-    onClose: () => void;
-    onClaim: () => Promise<void>;
-}) {
-    const [data, setData] = useState<CustomerCard>();
-    const [error, setError] = useState('');
-    const [busy, setBusy] = useState(false);
-    const [confirm, setConfirm] = useState(false);
-    const [message, setMessage] = useState('');
-    const load = useCallback(() => api<CustomerCard>(`admin/customers/${id}`).then(setData).catch((e: Error) => { setError(e.message); }), [id]);
-    useEffect(() => { void load(); }, [load]);
-    const cycle = data?.cycles.find(c => c.status !== 'reward_claimed');
-    async function claim() { if (!cycle)
-        return; setBusy(true); setError(''); try {
-        await api('admin/claim', { method: 'POST', body: JSON.stringify({ cycleId: cycle.id }) });
-        setConfirm(false);
-        setMessage('Reward marked as served. A fresh card is ready.');
-        await load();
-        await onClaim();
-    }
-    catch (e) {
-        setError((e as Error).message);
-    }
-    finally {
-        setBusy(false);
-    } }
-    return <Modal title={data?.profile.name || 'Customer details'} onClose={onClose}><Notice message={error}/><Notice message={message} success/>{!data ? <Busy /> : <><p className="modal-subtitle mb-6 mt-1 text-xs leading-5 text-muted">{data.profile.phone} · Joined {dateLabel(data.profile.created_at)}</p><div className="detail-card my-5 rounded-xl border border-[#dae3d1] bg-[#edf2e5] px-5 pt-5 [&>.stamps]:mb-4"><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><h3>Card #{cycle?.cycle_number}</h3><span>{cycle?.completed_checkpoints || 0} / 6 stamps</span></div><Stamps count={cycle?.completed_checkpoints || 0}/></div>{cycle?.status === 'completed' && <div className="claim-panel flex flex-col items-start gap-3 rounded-xl border border-[#ecd7c5] bg-[#fff7ee] p-5 [&>svg]:text-[#b48a64] [&>h3]:font-medium [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted"><Gift /><h3>{cycle.reward_name}</h3><p>{confirm ? 'Confirm the customer has received this dish. Their next card will start at zero.' : 'This regular has earned their reward. Confirm once the dish has been served.'}</p>{confirm ? <div className="button-row flex flex-wrap items-center gap-3"><button className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md" onClick={claim} disabled={busy}>{busy ? <Busy /> : 'Yes, the reward was served'}</button><button className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-secondary border border-line bg-white text-ink hover:border-forest/25 hover:bg-sage/30" onClick={() => setConfirm(false)} disabled={busy}>Cancel</button></div> : <button className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md" onClick={() => setConfirm(true)}>Mark reward as served</button>}</div>}<h3 className="detail-heading mb-2 mt-6 text-[13px] font-semibold">Loyalty history</h3>{data.cycles.map(c => <div className="history-cycle flex flex-wrap items-center justify-between gap-3 border-b border-line/70 py-3 text-xs last:border-0 [&>strong]:font-medium [&>small]:text-muted" key={c.id}><strong>Card #{c.cycle_number}</strong><span>{c.completed_checkpoints}/6 stamps</span><span className={`badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 ${c.status === 'reward_claimed' ? "badge-green bg-[#edf4e9] text-[#4a6a41]" : "badge-neutral bg-[#f3f4f0] text-[#737b70]"}`}>{c.status === 'reward_claimed' ? 'Reward enjoyed' : c.status === 'completed' ? 'Reward ready' : 'In progress'}</span></div>)}<h3 className="detail-heading mb-2 mt-6 text-[13px] font-semibold">Recent visits</h3>{data.checkins.length ? data.checkins.slice(0, 12).map(c => <div key={c.id} className="history-cycle flex flex-wrap items-center justify-between gap-3 border-b border-line/70 py-3 text-xs last:border-0 [&>strong]:font-medium [&>small]:text-muted"><span>Stamp {c.checkpoint_number}</span><small>{dateLabel(c.created_at)}</small></div>) : <p className="muted text-sm leading-6 text-muted">No visits yet. The first one is always special.</p>}</>}</Modal>;
-}
-function Codes({ initial, refresh }: {
-    initial: LoyaltyCode[];
-    refresh: () => Promise<void>;
-}) {
-    const [codes, setCodes] = useState(initial);
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState('');
-    const [copied, setCopied] = useState(false);
-    const now = useNow();
-    const active = codes.find(c => isActive(c, now));
-    const seconds = active ? Math.max(0, Math.ceil((Date.parse(active.expires_at) - now) / 1000)) : 0;
-    useEffect(() => { api<LoyaltyCode[]>('admin/codes').then(setCodes).catch(e => setError(e.message)); }, [initial]);
-    async function generate() { setBusy(true); setError(''); setCopied(false); try {
-        await api('admin/codes', { method: 'POST' });
-        setCodes(await api<LoyaltyCode[]>('admin/codes'));
-        await refresh();
-    }
-    catch (e) {
-        setError((e as Error).message);
-    }
-    finally {
-        setBusy(false);
-    } }
-    async function copy() { try {
-        await navigator.clipboard.writeText(active!.code);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    }
-    catch {
-        setError('Copy is unavailable. You can select the code and copy it manually.');
-    } }
-    return <><div className="codes-grid mb-7 grid items-start gap-8 md:grid-cols-2 xl:gap-14"><section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] code-generator p-6 sm:p-8 [&>h2]:mt-7 [&>h2]:text-2xl [&>h2]:font-medium [&>h2]:tracking-tight [&>p]:mt-3 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>small]:mt-4 [&>small]:block [&>small]:text-center [&>small]:text-[10px] [&>small]:text-muted"><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><span className="soft-icon inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-sage text-forest"><Ticket /></span><span className={`badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 ${active ? "badge-green bg-[#edf4e9] text-[#4a6a41]" : "badge-neutral bg-[#f3f4f0] text-[#737b70]"}`}><span className="status-dot inline-block size-1.5 shrink-0 rounded-full bg-[#719162]"/>{active ? 'LIVE CODE' : 'READY WHEN YOU ARE'}</span></div><h2>{active ? 'A stamp for their next visit.' : 'Make their visit count.'}</h2><p>{active ? 'Share this code after a purchase. Each customer can use it once.' : 'Generate a code and share it with customers after their purchase.'}</p><Notice message={error}/><div className={`generated-code my-8 rounded-xl border border-dashed border-forest/20 bg-[#f4f7ee] py-8 text-center font-mono text-[clamp(2rem,4vw,3rem)] font-medium tracking-[0.14em] text-forest ${!active ? "code-placeholder !text-forest/20" : ""}`}>{active?.code || '••••••'}</div>{active && <div className="code-countdown mb-4 flex items-center justify-center gap-2 text-xs text-muted [&>strong]:font-mono [&>strong]:text-forest"><Clock3 size={18}/> Expires in <strong>{String(Math.floor(seconds / 60)).padStart(2, '0')}:{String(seconds % 60).padStart(2, '0')}</strong></div>}<div className="countdown-track mb-5 h-1 overflow-hidden rounded-full bg-line [&>span]:block [&>span]:h-full [&>span]:rounded-full [&>span]:bg-[#a6bd8f] [&>span]:transition-all"><span style={{ width: `${seconds / 300 * 100}%` }}/></div>{active ? <button className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md button-full w-full" onClick={copy}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? 'Copied to clipboard' : 'Copy code'}</button> : <button className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md button-full w-full" onClick={generate} disabled={busy}>{busy ? <Busy label="Generating"/> : <><Plus size={18}/> Generate a new code</>}</button>}<small>{active ? 'A new code can be generated after this one expires.' : 'Every code is valid for exactly five minutes.'}</small></section><section className="code-how py-5 [&>h2]:mb-8 [&>h2]:mt-3 [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:leading-tight [&>h2]:tracking-tight"><span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">A SMALL GESTURE, A HAPPY REGULAR</span><h2>From a meal<br />to a little milestone.</h2>{[{ n: '01', title: 'Generate a code', text: 'Your unique code stays active for five minutes.' }, { n: '02', title: 'Share after a purchase', text: 'Multiple customers can use the same active code.' }, { n: '03', title: 'Watch their card grow', text: 'One use, one stamp. The sixth unlocks their reward.' }].map(item => <div className="code-step mb-7 flex items-start gap-4 [&>span]:flex [&>span]:size-8 [&>span]:shrink-0 [&>span]:items-center [&>span]:justify-center [&>span]:rounded-full [&>span]:border [&>span]:border-[#dce4d3] [&>span]:bg-sage/50 [&>span]:font-mono [&>span]:text-[10px] [&>span]:text-forest [&_h3]:text-sm [&_h3]:font-medium [&_p]:mt-1.5 [&_p]:text-xs [&_p]:leading-6 [&_p]:text-muted" key={item.n}><span>{item.n}</span><div><h3>{item.title}</h3><p>{item.text}</p></div></div>)}</section></div><section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] code-history overflow-hidden [&>.section-heading]:p-5"><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><div><h3>Your recent codes</h3><p>A little history of every invitation back.</p></div><Clock3 size={20}/></div>{!codes.length ? <div className="empty-state flex min-h-56 flex-col items-center justify-center gap-3 p-6 text-center [&>svg]:mb-1 [&>svg]:size-8 [&>svg]:text-[#a5b496] [&>h3]:text-sm [&>h3]:font-medium [&>h4]:text-xs [&>h4]:font-medium [&>p]:max-w-xs [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>.text-link]:mt-2 [&>.text-link]:!text-xs"><Ticket /><p>Your first code will appear here.</p></div> : <div className="table-scroll w-full overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_th]:whitespace-nowrap [&_th]:border-y [&_th]:border-line/80 [&_th]:bg-[#fafbf8] [&_th]:px-5 [&_th]:py-3 [&_th]:text-left [&_th]:text-[9px] [&_th]:font-medium [&_th]:text-muted [&_td]:border-b [&_td]:border-line/60 [&_td]:px-5 [&_td]:py-4 [&_td]:text-[11px] [&_td]:text-muted [&_tbody_tr:last-child_td]:border-0 [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-cream/70"><table><thead><tr><th>Code</th><th>Created</th><th>Expires</th><th>Status</th></tr></thead><tbody>{codes.map(c => <tr key={c.id}><td><strong className="mono font-mono tracking-wider">{c.code}</strong></td><td>{dateLabel(c.created_at)}</td><td>{dateLabel(c.expires_at)}</td><td><span className={`badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 ${isActive(c, now) ? "badge-green bg-[#edf4e9] text-[#4a6a41]" : "badge-neutral bg-[#f3f4f0] text-[#737b70]"}`}>{isActive(c, now) ? 'Active' : 'Expired'}</span></td></tr>)}</tbody></table></div>}</section></>;
-}
-function RewardEditor({ reward, refresh }: {
-    reward: Reward;
-    refresh: () => Promise<void>;
-}) {
-    const [name, setName] = useState(reward.name);
-    const [description, setDescription] = useState(reward.description);
-    const [image, setImage] = useState(reward.image_url);
-    const [busy, setBusy] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const [error, setError] = useState('');
-    const [message, setMessage] = useState('');
-    async function upload(file?: File) { if (!file)
-        return; setUploading(true); setError(''); setMessage(''); try {
-        const form = new FormData();
-        form.append('image', file);
-        const data = await api<{
-            image_url: string;
-        }>('admin/reward/image', { method: 'POST', body: form });
-        setImage(data.image_url);
-    }
-    catch (e) {
-        setError((e as Error).message);
-    }
-    finally {
-        setUploading(false);
-    } }
-    async function save(e: FormEvent) { e.preventDefault(); setBusy(true); setError(''); setMessage(''); try {
-        await api('admin/reward', { method: 'PUT', body: JSON.stringify({ name, description, image_url: image }) });
-        setMessage('Your reward is saved. Your regulars have something to look forward to.');
-        await refresh();
-    }
-    catch (e) {
-        setError((e as Error).message);
-    }
-    finally {
-        setBusy(false);
-    } }
-    return <div className="editor-grid grid items-start gap-8 xl:grid-cols-[1.2fr_1fr]"><form className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] editor-form p-6 sm:p-8 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>h3]:text-base [&>h3]:font-medium [&>button]:self-start form-stack flex flex-col gap-5" onSubmit={save}><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><h3>The sixth-visit reward</h3><Gift size={20}/></div><p>Something delicious. Something worth coming back for.</p><Notice message={error}/><Notice message={message} success/><label>Reward name<input value={name} onChange={e => setName(e.target.value)} required minLength={2} maxLength={80} placeholder="e.g. Chicken noodles"/></label><label>A little description <span className="optional ml-1 text-[10px] font-normal text-muted">Optional</span><textarea value={description} onChange={e => setDescription(e.target.value)} maxLength={240} rows={3} placeholder="Tell your regulars what makes it special."/></label><label>Reward photo<div className="upload-zone relative mt-2 flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#cfd8c6] bg-[#f8faf4] p-4 text-center [&>svg]:text-[#8a9c79] [&>strong]:text-xs [&>strong]:font-medium [&>span]:text-[10px] [&>span]:font-normal [&>span]:text-muted [&>input]:absolute [&>input]:inset-0 [&>input]:h-full [&>input]:w-full [&>input]:cursor-pointer [&>input]:opacity-0 focus-within:ring-2 focus-within:ring-forest"><Upload size={25}/><strong>{uploading ? 'Uploading your photo…' : 'Drop in a little deliciousness'}</strong><span>Choose a JPG, PNG or WebP · Up to 5 MB</span><input type="file" accept="image/jpeg,image/png,image/webp" aria-label="Upload reward image" disabled={uploading} onChange={e => void upload(e.target.files?.[0])}/></div></label>{image && <button type="button" className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4" onClick={() => setImage(null)}>Remove photo</button>}<div className="editor-note flex items-start gap-2.5 rounded-xl bg-[#f2f5ed] p-4 [&>svg]:mt-0.5 [&>svg]:shrink-0 [&>svg]:text-[#7f946e] [&>p]:text-[11px] [&>p]:font-normal [&>p]:leading-6 [&>p]:text-muted [&_a]:text-forest [&_a]:underline"><CheckCircle2 size={18}/><p>Already-earned rewards keep their original dish. Changes apply to future completed cards.</p></div><button className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md" disabled={busy || uploading}>{busy ? <Busy label="Saving"/> : <>Save reward <Check size={17}/></>}</button></form><aside className="reward-preview mx-auto w-full max-w-md [&>p]:mb-5 [&>p]:mt-1 [&>p]:text-xs [&>p]:text-muted [&>.member-reward]:p-6"><span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">A LITTLE PREVIEW</span><p>Here’s how your regulars will see it.</p><div className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] member-reward overflow-hidden p-5 [&>.dish-art]:my-5 [&>.dish-art]:rounded-xl [&>.reward-image]:my-5 [&>h2]:mt-3 [&>h2]:text-2xl [&>h2]:font-medium [&>h2]:tracking-tight [&>p]:mt-2 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted"><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">YOUR SIXTH VISIT IS ON US</span><Gift size={18}/></div><RewardVisual image={image} name={name}/><span className="badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 badge-peach bg-[#f9ede2] text-[#956236]">MADE FOR OUR REGULARS</span><h2>{name || 'Your next delicious reward'}</h2><p>{description || 'Six visits. One lovely thank you.'}</p><div className="preview-stamps mt-5 border-t border-line pt-2"><Stamps count={6} compact/></div></div></aside></div>;
-}
-function SettingsEditor({ shop, refresh }: {
-    shop: Shop;
-    refresh: () => Promise<void>;
-}) {
-    const [name, setName] = useState(shop.name);
-    const [tagline, setTagline] = useState(shop.tagline);
-    const [url, setUrl] = useState(shop.website_url || '');
-    const [currentPassword, setCurrentPassword] = useState('');
-    const [password, setPassword] = useState('');
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState('');
-    const [message, setMessage] = useState('');
-    async function save(e: FormEvent) { e.preventDefault(); setBusy(true); setError(''); setMessage(''); try {
-        await api('admin/settings', { method: 'PUT', body: JSON.stringify({ name, tagline, website_url: url }) });
-        setMessage('Shop details saved. Refresh the page to update the navigation.');
-        await refresh();
-    }
-    catch (e) {
-        setError((e as Error).message);
-    }
-    finally {
-        setBusy(false);
-    } }
-    async function changePassword(e: FormEvent) { e.preventDefault(); setBusy(true); setError(''); setMessage(''); try {
-        await api('admin/password', { method: 'PUT', body: JSON.stringify({ currentPassword, password }) });
-        setPassword('');
-        setCurrentPassword('');
-        setMessage('Your password has been updated.');
-    }
-    catch (e) {
-        setError((e as Error).message);
-    }
-    finally {
-        setBusy(false);
-    } }
-    return <div className="settings-content max-w-2xl space-y-6"><Notice message={error}/><Notice message={message} success/><form className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] editor-form p-6 sm:p-8 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>h3]:text-base [&>h3]:font-medium [&>button]:self-start form-stack flex flex-col gap-5" onSubmit={save}><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><h3>Your shop</h3><Settings size={20}/></div><label>Shop name<input required minLength={2} maxLength={60} value={name} onChange={e => setName(e.target.value)}/></label><label>Tagline<input maxLength={100} value={tagline} onChange={e => setTagline(e.target.value)}/></label><label>Published website address <span className="optional ml-1 text-[10px] font-normal text-muted">For your shop QR code</span><input type="url" value={url} placeholder="https://your-shop.com" onChange={e => setUrl(e.target.value)}/></label><p className="field-help -mt-2 text-xs leading-5 text-muted">Set this to your live HTTPS website before printing your shop QR code.</p><button className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md" disabled={busy}>{busy ? <Busy /> : 'Save shop details'}</button></form><form className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] editor-form p-6 sm:p-8 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>h3]:text-base [&>h3]:font-medium [&>button]:self-start form-stack flex flex-col gap-5" onSubmit={changePassword}><h3>Keep your corner secure</h3><label>Current password<input type="password" autoComplete="current-password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required/></label><label>New password<input type="password" autoComplete="new-password" minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} required/></label><p className="field-help -mt-2 text-xs leading-5 text-muted">Use at least 12 characters. A few unexpected words work well.</p><button className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-secondary border border-line bg-white text-ink hover:border-forest/25 hover:bg-sage/30" disabled={busy}>Update password</button></form></div>;
-}
-function QrPanel({ shop }: {
-    shop: Shop;
-}) {
-    const [image, setImage] = useState('');
-    const [url, setUrl] = useState('');
-    const [error, setError] = useState('');
-    useEffect(() => { const target = new URL('/loyalty', shop.website_url || window.location.origin).href; let cancelled = false; QRCode.toDataURL(target, { width: 600, margin: 3, color: { dark: '#254e3d', light: '#ffffff' }, errorCorrectionLevel: 'H' }).then(value => { if (!cancelled) { setImage(value); setUrl(target); } }).catch(() => { if (!cancelled) setError('Could not create the QR code. Please refresh.'); }); return () => { cancelled = true; }; }, [shop.website_url]);
-    return <div className="qr-layout grid items-center gap-10 xl:grid-cols-2 xl:gap-14"><div className="qr-poster mx-auto flex w-full max-w-[450px] flex-col items-center rounded-2xl border border-[#dce4d4] bg-[#eef2e6] px-6 py-10 text-center shadow-sm [&>.mini-label]:mt-8 [&>h2]:mt-3 [&>h2]:text-4xl [&>h2]:font-medium [&>h2]:leading-[1.2] [&>h2]:tracking-tight [&>h2_em]:font-serif [&>h2_em]:font-normal [&>h2_em]:text-[#7e916f] [&>p]:mb-6 [&>p]:mt-4 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>img]:size-[225px] [&>img]:rounded-xl [&>.stamps]:w-[230px] [&>strong]:mt-2 [&>strong]:text-[9px] [&>strong]:font-medium [&>strong]:tracking-[0.12em] [&>small]:mt-3 [&>small]:max-w-full [&>small]:break-all [&>small]:text-[9px] [&>small]:text-muted" id="print-qr"><Brand name={shop.name}/><span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">GOOD THINGS COME TO REGULARS</span><h2>Scan. Savour.<br /><em>Get a little back.</em></h2><p>Join our regulars club.<br />Six visits. A dish on the house.</p>{image ? <Image unoptimized src={image} alt={`QR code to join ${shop.name}'s loyalty program`} width={250} height={250}/> : <Busy />}<Stamps count={0} compact/><strong>YOUR SIXTH VISIT IS ON US.</strong><small>{url}</small></div><section className="qr-info max-w-md [&>h2]:mt-6 [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:leading-tight [&>h2]:tracking-tight [&>p]:mb-6 [&>p]:mt-4 [&>p]:text-sm [&>p]:leading-7 [&>p]:text-muted [&>.button-row]:my-6 [&>.text-link]:!text-xs"><span className="soft-icon inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-sage text-forest"><QrCode size={26}/></span><h2>More regulars,<br />one scan at a time.</h2><p>Display this at the counter, on a table, or beside the menu. Customers scan to get their own digital loyalty card.</p><Notice message={error}/>{!shop.website_url && <div className="editor-note flex items-start gap-2.5 rounded-xl bg-[#f2f5ed] p-4 [&>svg]:mt-0.5 [&>svg]:shrink-0 [&>svg]:text-[#7f946e] [&>p]:text-[11px] [&>p]:font-normal [&>p]:leading-6 [&>p]:text-muted [&_a]:text-forest [&_a]:underline"><Settings size={20}/><p>This preview uses your current address. Add your published website in <Link href="/admin/settings">Settings</Link> before printing for customers.</p></div>}<div className="button-row flex flex-wrap items-center gap-3"><a className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md" href={image || undefined} download={`${shop.name.toLowerCase()}-loyalty-qr.png`} aria-disabled={!image}><Download size={17}/> Download QR</a><button className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-secondary border border-line bg-white text-ink hover:border-forest/25 hover:bg-sage/30" disabled={!image} onClick={() => window.print()}><Printer size={17}/> Print poster</button></div><Link href="/loyalty" target="_blank" className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4">Try the customer experience <ArrowUpRight size={16}/></Link></section></div>;
+          setError("Could not create the QR code. Please refresh.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [shop.website_url]);
+  return (
+    <div className="qr-layout grid items-center gap-10 xl:grid-cols-2 xl:gap-14">
+      <div
+        className="qr-poster mx-auto flex w-full max-w-[450px] flex-col items-center rounded-2xl border border-[#dce4d4] bg-[#eef2e6] px-6 py-10 text-center shadow-sm [&>.mini-label]:mt-8 [&>h2]:mt-3 [&>h2]:text-4xl [&>h2]:font-medium [&>h2]:leading-[1.2] [&>h2]:tracking-tight [&>h2_em]:font-serif [&>h2_em]:font-normal [&>h2_em]:text-[#7e916f] [&>p]:mb-6 [&>p]:mt-4 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>img]:size-[225px] [&>img]:rounded-xl [&>.stamps]:w-[230px] [&>strong]:mt-2 [&>strong]:text-[9px] [&>strong]:font-medium [&>strong]:tracking-[0.12em] [&>small]:mt-3 [&>small]:max-w-full [&>small]:break-all [&>small]:text-[9px] [&>small]:text-muted"
+        id="print-qr"
+      >
+        <Brand name={shop.name} />
+        <span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">
+          GOOD THINGS COME TO REGULARS
+        </span>
+        <h2>
+          Scan. Savour.
+          <br />
+          <em>Get a little back.</em>
+        </h2>
+        <p>
+          Join our regulars club.
+          <br />
+          Six visits. A dish on the house.
+        </p>
+        {image ? (
+          <Image
+            unoptimized
+            src={image}
+            alt={`QR code to join ${shop.name}'s loyalty program`}
+            width={250}
+            height={250}
+          />
+        ) : (
+          <Busy />
+        )}
+        <Stamps count={0} compact />
+        <strong>YOUR SIXTH VISIT IS ON US.</strong>
+        <small>{url}</small>
+      </div>
+      <section className="qr-info max-w-md [&>h2]:mt-6 [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:leading-tight [&>h2]:tracking-tight [&>p]:mb-6 [&>p]:mt-4 [&>p]:text-sm [&>p]:leading-7 [&>p]:text-muted [&>.button-row]:my-6 [&>.text-link]:!text-xs">
+        <span className="soft-icon inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-sage text-forest">
+          <QrCode size={26} />
+        </span>
+        <h2>
+          More regulars,
+          <br />
+          one scan at a time.
+        </h2>
+        <p>
+          Display this at the counter, on a table, or beside the menu. Customers
+          scan to get their own digital loyalty card.
+        </p>
+        <Notice message={error} />
+        {!shop.website_url && (
+          <div className="editor-note flex items-start gap-2.5 rounded-xl bg-[#f2f5ed] p-4 [&>svg]:mt-0.5 [&>svg]:shrink-0 [&>svg]:text-[#7f946e] [&>p]:text-[11px] [&>p]:font-normal [&>p]:leading-6 [&>p]:text-muted [&_a]:text-forest [&_a]:underline">
+            <Settings size={20} />
+            <p>
+              This preview uses your current address. Add your published website
+              in <Link href="/admin/settings">Settings</Link> before printing
+              for customers.
+            </p>
+          </div>
+        )}
+        <div className="button-row flex flex-wrap items-center gap-3">
+          <a
+            className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md"
+            href={image || undefined}
+            download={`${shop.name.toLowerCase()}-loyalty-qr.png`}
+            aria-disabled={!image}
+          >
+            <Download size={17} /> Download QR
+          </a>
+          <button
+            className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-secondary border border-line bg-white text-ink hover:border-forest/25 hover:bg-sage/30"
+            disabled={!image}
+            onClick={() => window.print()}
+          >
+            <Printer size={17} /> Print poster
+          </button>
+        </div>
+        <Link
+          href="/loyalty"
+          target="_blank"
+          className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4"
+        >
+          Try the customer experience <ArrowUpRight size={16} />
+        </Link>
+      </section>
+    </div>
+  );
 }

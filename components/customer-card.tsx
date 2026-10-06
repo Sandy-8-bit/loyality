@@ -1,55 +1,379 @@
-'use client';
-import { useEffect, useState, useCallback, type FormEvent } from 'react';
-import { ArrowRight, Gift, History, RefreshCw, Sparkles, CheckCircle2 } from 'lucide-react';
-import { Brand, Stamps, RewardVisual } from './brand';
-import { api, dateLabel } from '@/lib/api-client';
-import { Busy, Notice } from './shared';
-import type { CustomerCard as CardData } from '@/lib/types';
+"use client";
+import { useEffect, useState, useCallback, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowRight,
+  Gift,
+  History,
+  RefreshCw,
+  Sparkles,
+  CheckCircle2,
+} from "lucide-react";
+import { Brand, Stamps, RewardVisual } from "./brand";
+import { api, dateLabel } from "@/lib/api-client";
+import { Busy, Notice } from "./shared";
+import type { CustomerCard as CardData } from "@/lib/types";
 export function CustomerCard() {
-    const [data, setData] = useState<CardData>();
-    const [code, setCode] = useState('');
-    const [name, setName] = useState('');
-    const [error, setError] = useState('');
-    const [message, setMessage] = useState('');
-    const [busy, setBusy] = useState(false);
-    const [history, setHistory] = useState(false);
-    const refresh = useCallback(() => api<CardData>('customer/loyalty').then(value => { setData(value); setError(''); }).catch((e: Error) => { setError(e.message); }), []);
-    useEffect(() => { void refresh(); const timer = setInterval(() => { if (document.visibilityState === 'visible')
-        void refresh(); }, 30000); return () => clearInterval(timer); }, [refresh]);
-    async function collect(event: FormEvent) { event.preventDefault(); setBusy(true); setError(''); setMessage(''); try {
-        const result = await api<{
-            checkpoint: number;
-            rewardUnlocked: boolean;
-        }>('customer/loyalty/validate-code', { method: 'POST', body: JSON.stringify({ code }) });
-        setCode('');
-        setMessage(result.rewardUnlocked ? 'Six stamps! Your reward is ready to enjoy.' : `Stamp ${result.checkpoint} collected. Thanks for stopping by!`);
-        await refresh();
+  const router = useRouter();
+  const [data, setData] = useState<CardData>();
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [history, setHistory] = useState(false);
+  const refresh = useCallback(
+    () =>
+      api<CardData>("customer/loyalty")
+        .then((value) => {
+          setData(value);
+          setError("");
+        })
+        .catch((e: Error) => {
+          setError(e.message);
+        }),
+    [],
+  );
+  useEffect(() => {
+    void refresh();
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [refresh]);
+  async function collect(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await api<{
+        checkpoint: number;
+        rewardUnlocked: boolean;
+      }>("customer/loyalty/validate-code", {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      });
+      setCode("");
+      setMessage(
+        result.rewardUnlocked
+          ? "Six stamps! Your reward is ready to enjoy."
+          : `Stamp ${result.checkpoint} collected. Thanks for stopping by!`,
+      );
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
     }
-    catch (e) {
-        setError((e as Error).message);
+  }
+  async function saveName(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      await api("customer/profile", {
+        method: "PUT",
+        body: JSON.stringify({ name }),
+      });
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
     }
-    finally {
-        setBusy(false);
-    } }
-    async function saveName(event: FormEvent) { event.preventDefault(); setBusy(true); try {
-        await api('customer/profile', { method: 'PUT', body: JSON.stringify({ name }) });
-        await refresh();
+  }
+  async function logout() {
+    setBusy(true);
+    setError("");
+    try {
+      await api("auth/logout", { method: "POST" });
+      router.replace("/loyalty");
+      router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
     }
-    catch (e) {
-        setError((e as Error).message);
-    }
-    finally {
-        setBusy(false);
-    } }
-    if (!data)
-        return <main className="loading-page flex min-h-[80vh] flex-col items-center justify-center gap-6 p-8 text-center [&>h1]:text-3xl [&>h1]:font-semibold [&>p]:max-w-md [&>p]:text-sm [&>p]:text-muted"><Brand /><Notice message={error}/>{error ? <button className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md" onClick={refresh}>Try again</button> : <Busy label="Getting your card ready"/>}</main>;
-    const cycle = data.cycles.find(c => c.status !== 'reward_claimed');
-    const count = cycle?.completed_checkpoints || 0;
-    const unlocked = count === 6;
-    return <div className="customer-site min-h-screen bg-cream"><header className="public-header mx-auto flex h-24 max-w-7xl items-center justify-between gap-3 border-b border-line/80 px-5 sm:px-10 lg:px-16"><Brand name={data.shop.name}/><span className="rounded-full bg-sage px-3 py-2 text-[10px] font-medium text-forest">Your regulars card</span></header><main className="member-main mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-14"><div className="member-heading mb-9 flex flex-wrap items-center justify-between gap-3 [&_h1]:mt-2 [&_h1]:text-4xl [&_h1]:font-medium [&_h1]:tracking-tight [&_p]:mt-3 [&_p]:text-sm [&_p]:text-muted"><div><span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">THE REGULARS CLUB</span><h1>Hi, {data.profile.name || 'there'}<span className="wave ml-3 text-[#c49b71]">✳</span></h1><p>A familiar face. A little closer to your next treat.</p></div><span className="member-phone rounded-full border border-line px-4 py-2 text-xs text-muted">{data.profile.phone}</span></div><Notice message={error}/><Notice message={message} success/>
-    {!data.profile.name && <form className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] name-form mb-6 flex flex-wrap items-end gap-4 p-5 [&>h3]:w-full [&>h3]:font-medium [&>label]:flex-1" onSubmit={saveName}><h3>First, what should we call you?</h3><label>Your name<input required minLength={2} maxLength={60} value={name} onChange={e => setName(e.target.value)}/></label><button className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md" disabled={busy}>Save my name</button></form>}
-    <div className="member-grid grid items-start gap-6 md:grid-cols-[1.4fr_1fr]"><section><div className={`member-card overflow-hidden rounded-[22px] bg-forest p-6 text-cream sm:p-8 [&_.stamp>span]:border-cream/30 [&_.stamp>span]:text-cream/30 [&_.stamp>small]:text-cream/60 [&_.stamp-done>span]:!border-cream [&_.stamp-done>span]:!bg-cream [&_.stamp-done>span]:!text-forest [&_.stamp-reward>span]:!border-[#d7b48c] [&_.stamp-reward>span]:!text-[#d7b48c] [&>h2]:my-9 [&>h2]:whitespace-pre-line [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:leading-tight [&>h2]:italic ${unlocked ? "member-card-complete !bg-[#355942]" : ""}`}><div className="member-card-top flex items-center justify-between gap-3 [&>span]:text-right [&>span]:text-[8px] [&>span]:leading-5 [&>span]:tracking-widest [&_small]:text-cream/50"><Brand name={data.shop.name} light/><span>YOUR LOYALTY CARD<br /><small>CARD NO. {String(cycle?.cycle_number || 1).padStart(3, '0')}</small></span></div><h2>{unlocked ? 'This one’s on us.' : 'Your next favourite\ncomes with a thank you.'}</h2><Stamps count={count}/><div className="member-progress mt-8 [&>div:first-child]:flex [&>div:first-child]:items-center [&>div:first-child]:justify-between [&>div:first-child]:gap-3 [&_strong]:text-2xl [&_strong>span]:text-xs [&_strong>span]:font-normal [&_strong>span]:text-cream/70 [&>div>span]:text-[9px] [&>div>span]:text-cream/70"><div><strong>{count} <span>/ 6 stamps</span></strong><span>{unlocked ? 'A full card. A well-earned treat.' : `${6 - count} more ${6 - count === 1 ? 'visit' : 'visits'} to something delicious.`}</span></div><div className="progress-track mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10 [&>span]:block [&>span]:h-full [&>span]:rounded-full [&>span]:bg-[#cbd6b8] [&>span]:transition-all"><span style={{ width: `${count / 6 * 100}%` }}/></div></div></div>
-    {unlocked ? <div className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] reward-unlocked mt-6 flex flex-col items-center gap-4 p-7 text-center [&>h2]:text-xl [&>h2]:font-medium [&>p]:text-sm [&>p]:leading-7 [&>p]:text-muted"><span className="round-icon inline-flex size-14 items-center justify-center rounded-full bg-sage text-forest"><Gift /></span><h2>You’ve earned a little celebration.</h2><p>Show this card to the shopkeeper to receive <strong>{cycle?.reward_name}</strong>. They’ll confirm your reward and start your next card.</p><span className="badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 badge-green bg-[#edf4e9] text-[#4a6a41]">Reward ready to claim</span><button className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4" onClick={refresh}><RefreshCw size={15}/> Refresh after claiming</button></div> : <form className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] code-entry mt-6 p-6 [&>p]:mb-5 [&>p]:mt-1 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>small]:mt-3 [&>small]:block [&>small]:text-[10px] [&>small]:text-muted" onSubmit={collect}><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><h3>Just enjoyed a meal?</h3><span className="soft-icon inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-sage text-forest"><Sparkles size={19}/></span></div><p>Ask the shopkeeper for today’s code and collect your stamp.</p><label>Shop code<div className="code-input-row flex flex-wrap items-end gap-3 [&>input]:min-w-0 [&>input]:flex-1 [&>input]:basis-28 [&>input]:font-mono [&>input]:tracking-[0.2em]"><input value={code} onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} placeholder="1234AB" maxLength={6} minLength={6} pattern="[0-9]{4}[A-Z]{2}" required autoComplete="off" aria-label="Shop code"/><button className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md" disabled={busy || !data.profile.name}>{busy ? <Busy label="Checking"/> : <>Collect stamp <ArrowRight size={17}/></>}</button></div></label><small>Codes are valid for 5 minutes. One stamp per code.</small></form>}
-    </section><aside><div className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] member-reward overflow-hidden p-5 [&>.dish-art]:my-5 [&>.dish-art]:rounded-xl [&>.reward-image]:my-5 [&>h2]:mt-3 [&>h2]:text-2xl [&>h2]:font-medium [&>h2]:tracking-tight [&>p]:mt-2 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted"><div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted"><span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">{unlocked ? 'YOUR WELL-EARNED REWARD' : 'SOMETHING TO LOOK FORWARD TO'}</span><Gift size={19}/></div><RewardVisual image={unlocked ? cycle?.reward_image_url : data.reward.image_url} name={unlocked ? cycle?.reward_name || '' : data.reward.name}/><span className="badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 badge-peach bg-[#f9ede2] text-[#956236]">{unlocked ? 'UNLOCKED' : 'YOUR SIXTH VISIT'}</span><h2>{unlocked ? cycle?.reward_name : data.reward.name}</h2><p>{unlocked ? 'Made for you. On the house.' : data.reward.description}</p></div><div className="member-tip mt-6 flex gap-3 px-2 text-forest [&>svg]:mt-0.5 [&>svg]:shrink-0 [&_strong]:text-xs [&_strong]:font-medium [&_p]:mt-1.5 [&_p]:text-xs [&_p]:leading-6 [&_p]:text-muted"><CheckCircle2 size={20}/><div><strong>Always here, always yours.</strong><p>Your card stays on this browser. Come back here to keep collecting your stamps.</p></div></div></aside></div>
-    <section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] history-panel mt-7 overflow-hidden"><button className="history-toggle flex w-full flex-wrap items-center justify-between gap-3 p-5 text-left text-xs [&>span]:flex [&>span]:items-center [&>span]:gap-2 [&>span:first-child]:font-medium [&>span:last-child]:text-muted" onClick={() => setHistory(!history)} aria-expanded={history}><span><History size={20}/> Your loyalty journey</span><span>{data.cycles.filter(c => c.status === 'reward_claimed').length} rewards enjoyed <ArrowRight size={18}/></span></button>{history && <div className="history-content border-t border-line px-5 py-3 [&>h3]:mb-3 [&>h3]:mt-6 [&>h3]:text-sm [&>h3]:font-medium [&>p]:pb-4 [&>p]:text-xs [&>p]:text-muted">{data.cycles.map(c => <div className="history-cycle flex flex-wrap items-center justify-between gap-3 border-b border-line/70 py-3 text-xs last:border-0 [&>strong]:font-medium [&>small]:text-muted" key={c.id}><strong>Card #{c.cycle_number}</strong><span>{c.completed_checkpoints}/6 stamps</span><span className={`badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 ${c.status === 'reward_claimed' ? "badge-green bg-[#edf4e9] text-[#4a6a41]" : "badge-neutral bg-[#f3f4f0] text-[#737b70]"}`}>{c.status === 'reward_claimed' ? `Enjoyed ${dateLabel(c.claimed_at)}` : c.status === 'completed' ? 'Reward ready' : 'In progress'}</span></div>)}<h3>Recent visits</h3>{data.checkins.length ? data.checkins.slice(0, 12).map(c => <div className="history-cycle flex flex-wrap items-center justify-between gap-3 border-b border-line/70 py-3 text-xs last:border-0 [&>strong]:font-medium [&>small]:text-muted" key={c.id}><span>Stamp {c.checkpoint_number}</span><span>{dateLabel(c.created_at)}</span></div>) : <p>Your first stamp is just a visit away.</p>}</div>}</section></main><footer className="public-footer mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-6 px-5 py-8 text-[11px] text-muted sm:px-10 lg:px-16 [&>span]:flex [&>span]:items-center [&>span]:gap-2 [&_.brand]:!text-[25px] [&_.brand-mark]:!size-7 [&_.brand-mark>svg]:!size-5"><span>{data.shop.name} · The regulars club</span><span>For the love of coming back.</span></footer></div>;
+  }
+  if (!data)
+    return (
+      <main className="loading-page flex min-h-[80vh] flex-col items-center justify-center gap-6 p-8 text-center [&>h1]:text-3xl [&>h1]:font-semibold [&>p]:max-w-md [&>p]:text-sm [&>p]:text-muted">
+        <Brand />
+        <Notice message={error} />
+        {error ? (
+          <button
+            className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md"
+            onClick={refresh}
+          >
+            Try again
+          </button>
+        ) : (
+          <Busy label="Getting your card ready" />
+        )}
+      </main>
+    );
+  const cycle = data.cycles.find((c) => c.status !== "reward_claimed");
+  const count = cycle?.completed_checkpoints || 0;
+  const unlocked = count === 6;
+  return (
+    <div className="customer-site min-h-screen bg-cream">
+      <header className="public-header mx-auto flex h-24 max-w-7xl items-center justify-between gap-3 border-b border-line/80 px-5 sm:px-10 lg:px-16">
+        <Brand name={data.shop.name} />
+        <button
+          className="rounded-full border border-line px-3 py-2 text-[10px] font-medium text-forest transition-colors hover:bg-sage disabled:opacity-60"
+          onClick={logout}
+          disabled={busy}
+        >
+          Log out
+        </button>
+      </header>
+      <main className="member-main mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
+        <div className="member-heading mb-9 flex flex-wrap items-center justify-between gap-3 [&_h1]:mt-2 [&_h1]:text-4xl [&_h1]:font-medium [&_h1]:tracking-tight [&_p]:mt-3 [&_p]:text-sm [&_p]:text-muted">
+          <div>
+            <span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">
+              THE REGULARS CLUB
+            </span>
+            <h1>
+              Hi, {data.profile.name || "there"}
+              <span className="wave ml-3 text-[#c49b71]">✳</span>
+            </h1>
+            <p>A familiar face. A little closer to your next treat.</p>
+          </div>
+          <span className="member-phone rounded-full border border-line px-4 py-2 text-xs text-muted">
+            {data.profile.phone}
+          </span>
+        </div>
+        <Notice message={error} />
+        <Notice message={message} success />
+        {!data.profile.name && (
+          <form
+            className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] name-form mb-6 flex flex-wrap items-end gap-4 p-5 [&>h3]:w-full [&>h3]:font-medium [&>label]:flex-1"
+            onSubmit={saveName}
+          >
+            <h3>First, what should we call you?</h3>
+            <label>
+              Your name
+              <input
+                required
+                minLength={2}
+                maxLength={60}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+            <button
+              className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md"
+              disabled={busy}
+            >
+              Save my name
+            </button>
+          </form>
+        )}
+        <div className="member-grid grid items-start gap-6 md:grid-cols-[1.4fr_1fr]">
+          <section>
+            <div
+              className={`member-card overflow-hidden rounded-[22px] bg-forest p-6 text-cream sm:p-8 [&_.stamp>span]:border-cream/30 [&_.stamp>span]:text-cream/30 [&_.stamp>small]:text-cream/60 [&_.stamp-done>span]:!border-cream [&_.stamp-done>span]:!bg-cream [&_.stamp-done>span]:!text-forest [&_.stamp-reward>span]:!border-[#d7b48c] [&_.stamp-reward>span]:!text-[#d7b48c] [&>h2]:my-9 [&>h2]:whitespace-pre-line [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:leading-tight [&>h2]:italic ${unlocked ? "member-card-complete !bg-[#355942]" : ""}`}
+            >
+              <div className="member-card-top flex items-center justify-between gap-3 [&>span]:text-right [&>span]:text-[8px] [&>span]:leading-5 [&>span]:tracking-widest [&_small]:text-cream/50">
+                <Brand name={data.shop.name} light />
+                <span>
+                  YOUR LOYALTY CARD
+                  <br />
+                  <small>
+                    CARD NO. {String(cycle?.cycle_number || 1).padStart(3, "0")}
+                  </small>
+                </span>
+              </div>
+              <h2>
+                {unlocked
+                  ? "This one’s on us."
+                  : "Your next favourite\ncomes with a thank you."}
+              </h2>
+              <Stamps count={count} />
+              <div className="member-progress mt-8 [&>div:first-child]:flex [&>div:first-child]:items-center [&>div:first-child]:justify-between [&>div:first-child]:gap-3 [&_strong]:text-2xl [&_strong>span]:text-xs [&_strong>span]:font-normal [&_strong>span]:text-cream/70 [&>div>span]:text-[9px] [&>div>span]:text-cream/70">
+                <div>
+                  <strong>
+                    {count} <span>/ 6 stamps</span>
+                  </strong>
+                  <span>
+                    {unlocked
+                      ? "A full card. A well-earned treat."
+                      : `${6 - count} more ${6 - count === 1 ? "visit" : "visits"} to something delicious.`}
+                  </span>
+                </div>
+                <div className="progress-track mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10 [&>span]:block [&>span]:h-full [&>span]:rounded-full [&>span]:bg-[#cbd6b8] [&>span]:transition-all">
+                  <span style={{ width: `${(count / 6) * 100}%` }} />
+                </div>
+              </div>
+            </div>
+            {unlocked ? (
+              <div className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] reward-unlocked mt-6 flex flex-col items-center gap-4 p-7 text-center [&>h2]:text-xl [&>h2]:font-medium [&>p]:text-sm [&>p]:leading-7 [&>p]:text-muted">
+                <span className="round-icon inline-flex size-14 items-center justify-center rounded-full bg-sage text-forest">
+                  <Gift />
+                </span>
+                <h2>You’ve earned a little celebration.</h2>
+                <p>
+                  Show this card to the shopkeeper to receive{" "}
+                  <strong>{cycle?.reward_name}</strong>. They’ll confirm your
+                  reward and start your next card.
+                </p>
+                <span className="badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 badge-green bg-[#edf4e9] text-[#4a6a41]">
+                  Reward ready to claim
+                </span>
+                <button
+                  className="text-link inline-flex items-center justify-center gap-2 text-[13px] font-medium text-forest hover:text-forest-dark hover:underline underline-offset-4"
+                  onClick={refresh}
+                >
+                  <RefreshCw size={15} /> Refresh after claiming
+                </button>
+              </div>
+            ) : (
+              <form
+                className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] code-entry mt-6 p-6 [&>p]:mb-5 [&>p]:mt-1 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted [&>small]:mt-3 [&>small]:block [&>small]:text-[10px] [&>small]:text-muted"
+                onSubmit={collect}
+              >
+                <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+                  <h3>Just enjoyed a meal?</h3>
+                  <span className="soft-icon inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-sage text-forest">
+                    <Sparkles size={19} />
+                  </span>
+                </div>
+                <p>
+                  Ask the shopkeeper for today’s code and collect your stamp.
+                </p>
+                <label>
+                  Shop code
+                  <div className="code-input-row flex flex-wrap items-end gap-3 [&>input]:min-w-0 [&>input]:flex-1 [&>input]:basis-28 [&>input]:font-mono [&>input]:tracking-[0.2em]">
+                    <input
+                      value={code}
+                      onChange={(e) =>
+                        setCode(
+                          e.target.value
+                            .toUpperCase()
+                            .replace(/[^A-Z0-9]/g, ""),
+                        )
+                      }
+                      placeholder="1234AB"
+                      maxLength={6}
+                      minLength={6}
+                      pattern="[0-9]{4}[A-Z]{2}"
+                      required
+                      autoComplete="off"
+                      aria-label="Shop code"
+                    />
+                    <button
+                      className="button inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-[13px] font-medium leading-5 transition-all active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 button-primary bg-forest text-white shadow-sm hover:bg-forest-dark hover:shadow-md"
+                      disabled={busy || !data.profile.name}
+                    >
+                      {busy ? (
+                        <Busy label="Checking" />
+                      ) : (
+                        <>
+                          Collect stamp <ArrowRight size={17} />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </label>
+                <small>
+                  Codes are valid for 5 minutes. One stamp per code.
+                </small>
+              </form>
+            )}
+          </section>
+          <aside>
+            <div className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] member-reward overflow-hidden p-5 [&>.dish-art]:my-5 [&>.dish-art]:rounded-xl [&>.reward-image]:my-5 [&>h2]:mt-3 [&>h2]:text-2xl [&>h2]:font-medium [&>h2]:tracking-tight [&>p]:mt-2 [&>p]:text-xs [&>p]:leading-6 [&>p]:text-muted">
+              <div className="section-heading flex items-center justify-between gap-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mt-1.5 [&_p]:text-xs [&_p]:font-normal [&_p]:leading-5 [&_p]:text-muted">
+                <span className="mini-label block text-[10px] font-semibold leading-5 tracking-[0.17em] text-forest/70">
+                  {unlocked
+                    ? "YOUR WELL-EARNED REWARD"
+                    : "SOMETHING TO LOOK FORWARD TO"}
+                </span>
+                <Gift size={19} />
+              </div>
+              <RewardVisual
+                image={
+                  unlocked ? cycle?.reward_image_url : data.reward.image_url
+                }
+                name={unlocked ? cycle?.reward_name || "" : data.reward.name}
+              />
+              <span className="badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 badge-peach bg-[#f9ede2] text-[#956236]">
+                {unlocked ? "UNLOCKED" : "YOUR SIXTH VISIT"}
+              </span>
+              <h2>{unlocked ? cycle?.reward_name : data.reward.name}</h2>
+              <p>
+                {unlocked
+                  ? "Made for you. On the house."
+                  : data.reward.description}
+              </p>
+            </div>
+            <div className="member-tip mt-6 flex gap-3 px-2 text-forest [&>svg]:mt-0.5 [&>svg]:shrink-0 [&_strong]:text-xs [&_strong]:font-medium [&_p]:mt-1.5 [&_p]:text-xs [&_p]:leading-6 [&_p]:text-muted">
+              <CheckCircle2 size={20} />
+              <div>
+                <strong>Always here, always yours.</strong>
+                <p>
+                  Your card stays on this browser. Come back here to keep
+                  collecting your stamps.
+                </p>
+              </div>
+            </div>
+          </aside>
+        </div>
+        <section className="panel min-w-0 rounded-2xl border border-line bg-white shadow-[0_3px_12px_-10px_#1b392930] history-panel mt-7 overflow-hidden">
+          <button
+            className="history-toggle flex w-full flex-wrap items-center justify-between gap-3 p-5 text-left text-xs [&>span]:flex [&>span]:items-center [&>span]:gap-2 [&>span:first-child]:font-medium [&>span:last-child]:text-muted"
+            onClick={() => setHistory(!history)}
+            aria-expanded={history}
+          >
+            <span>
+              <History size={20} /> Your loyalty journey
+            </span>
+            <span>
+              {data.cycles.filter((c) => c.status === "reward_claimed").length}{" "}
+              rewards enjoyed <ArrowRight size={18} />
+            </span>
+          </button>
+          {history && (
+            <div className="history-content border-t border-line px-5 py-3 [&>h3]:mb-3 [&>h3]:mt-6 [&>h3]:text-sm [&>h3]:font-medium [&>p]:pb-4 [&>p]:text-xs [&>p]:text-muted">
+              {data.cycles.map((c) => (
+                <div
+                  className="history-cycle flex flex-wrap items-center justify-between gap-3 border-b border-line/70 py-3 text-xs last:border-0 [&>strong]:font-medium [&>small]:text-muted"
+                  key={c.id}
+                >
+                  <strong>Card #{c.cycle_number}</strong>
+                  <span>{c.completed_checkpoints}/6 stamps</span>
+                  <span
+                    className={`badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium leading-4 ${c.status === "reward_claimed" ? "badge-green bg-[#edf4e9] text-[#4a6a41]" : "badge-neutral bg-[#f3f4f0] text-[#737b70]"}`}
+                  >
+                    {c.status === "reward_claimed"
+                      ? `Enjoyed ${dateLabel(c.claimed_at)}`
+                      : c.status === "completed"
+                        ? "Reward ready"
+                        : "In progress"}
+                  </span>
+                </div>
+              ))}
+              <h3>Recent visits</h3>
+              {data.checkins.length ? (
+                data.checkins.slice(0, 12).map((c) => (
+                  <div
+                    className="history-cycle flex flex-wrap items-center justify-between gap-3 border-b border-line/70 py-3 text-xs last:border-0 [&>strong]:font-medium [&>small]:text-muted"
+                    key={c.id}
+                  >
+                    <span>Stamp {c.checkpoint_number}</span>
+                    <span>{dateLabel(c.created_at)}</span>
+                  </div>
+                ))
+              ) : (
+                <p>Your first stamp is just a visit away.</p>
+              )}
+            </div>
+          )}
+        </section>
+      </main>
+      <footer className="public-footer mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-6 px-5 py-8 text-[11px] text-muted sm:px-10 lg:px-16 [&>span]:flex [&>span]:items-center [&>span]:gap-2 [&_.brand]:!text-[25px] [&_.brand-mark]:!size-7 [&_.brand-mark>svg]:!size-5">
+        <span>{data.shop.name} · The regulars club</span>
+        <span>For the love of coming back.</span>
+      </footer>
+    </div>
+  );
 }

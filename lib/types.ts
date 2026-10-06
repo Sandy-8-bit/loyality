@@ -1,7 +1,7 @@
 export type Profile = { id: string; name: string | null; phone: string | null; role: 'admin' | 'customer'; created_at: string; last_visit_at: string | null };
 export type Cycle = { id: string; customer_id: string; cycle_number: number; completed_checkpoints: number; status: 'active' | 'completed' | 'reward_claimed'; reward_name: string | null; reward_image_url: string | null; started_at: string; completed_at: string | null; claimed_at: string | null };
 export type Customer = Profile & { loyalty_cycles: Cycle[] };
-export type LoyaltyCode = { id: string; code: string; created_at: string; expires_at: string; revoked: boolean; created_date: string };
+export type LoyaltyCode = { id: string; code: string; created_at: string; expires_at: string; revoked: boolean; used_at: string | null; created_date: string };
 export type Reward = { id: number; name: string; description: string; image_url: string | null; updated_at: string };
 export type Shop = { id: number; name: string; tagline: string; website_url: string | null };
 export type Checkin = { id: string; checkpoint_number: number; created_at: string; cycle_id: string; profiles?: { name: string | null; phone: string | null } };

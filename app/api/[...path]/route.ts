@@ -90,8 +90,11 @@ async function handler(request: NextRequest, context: { params: Promise<{ path: 
         const { data, error } = await db.from('loyalty_codes').select('*').order('created_at', { ascending: false }).limit(100);
         check(error); result = data;
       } else if (path === 'admin/codes' && method === 'POST') {
-        const code = String(randomInt(0, 10000)).padStart(4, '0') + String.fromCharCode(65 + randomInt(26), 65 + randomInt(26));
-        result = await rpc(db, 'generate_loyalty_code', { p_code: code });
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const code = String(randomInt(0, 10000)).padStart(4, '0') + String.fromCharCode(65 + randomInt(26), 65 + randomInt(26));
+          try { result = await rpc(db, 'generate_loyalty_code', { p_code: code }); break; }
+          catch (error) { if (!(error instanceof ApiError) || error.message !== 'Please generate another code.' || attempt === 4) throw error; }
+        }
       } else if (path === 'admin/claim' && method === 'POST') {
         const { cycleId } = z.object({ cycleId: z.uuid() }).parse(await json());
         result = await rpc(db, 'claim_reward', { p_cycle_id: cycleId });
