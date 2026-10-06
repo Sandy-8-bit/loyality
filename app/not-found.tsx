@@ -1,0 +1,2 @@
+import Link from 'next/link';
+export default function NotFound(){return <main className="flex min-h-[80vh] flex-col items-center justify-center gap-5 px-6 text-center"><h1 className="text-3xl font-medium tracking-tight">A little lost?</h1><p className="text-sm text-muted">This page isn’t on the menu.</p><Link className="rounded-xl bg-forest px-5 py-3 text-sm text-white hover:bg-forest-dark" href="/loyalty">Back to Kora</Link></main>;}

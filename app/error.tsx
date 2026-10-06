@@ -1,0 +1,2 @@
+'use client';
+export default function ErrorPage({reset}:{reset:()=>void}){return <main className="flex min-h-[80vh] flex-col items-center justify-center gap-5 px-6 text-center"><h1 className="text-3xl font-medium tracking-tight">Let’s try that again.</h1><p className="max-w-md text-sm leading-6 text-muted">We couldn’t load this page. Please check your connection and retry.</p><button className="rounded-xl bg-forest px-5 py-3 text-sm text-white hover:bg-forest-dark" onClick={reset}>Try again</button></main>;}

@@ -1,0 +1,3 @@
+import { describe,it,expect } from 'vitest';
+import { normalizePhone,codeSchema } from '../lib/validation';
+describe('User input',()=>{it('normalizes Indian mobile numbers',()=>{for(const value of ['98765 43210','+91 98765 43210','919876543210'])expect(normalizePhone(value)).toBe('+919876543210');});it('rejects non-mobile and foreign numbers',()=>{for(const value of ['1234567890','+14155552671','98765','9876543210<script>'])expect(()=>normalizePhone(value)).toThrow();});it('requires exactly four digits and two letters',()=>{expect(codeSchema.parse({code:' 1234ab '}).code).toBe('1234AB');expect(()=>codeSchema.parse({code:'ABC123'})).toThrow();});});

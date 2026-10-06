@@ -1,26 +1,49 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-forest: #244d3d;
+  --color-forest-dark: #183b2e;
+  --color-sage: #e7ede3;
+  --color-cream: #faf9f6;
+  --color-ink: #27362e;
+  --color-muted: #747d75;
+  --color-line: #e6e9e2;
+  --color-peach: #f4dfcd;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body { @apply bg-cream font-sans text-ink antialiased; }
+  button, a, input, textarea { -webkit-tap-highlight-color: transparent; }
+  button, a { @apply transition-colors; }
+  button:not(:disabled), a { @apply cursor-pointer; }
+  button:disabled { @apply cursor-not-allowed opacity-45; }
+  button:focus-visible, a:focus-visible { @apply outline-2 outline-offset-4 outline-forest; }
+  label { @apply block text-[13px] font-medium text-ink; }
+  input:not([type="file"]), textarea {
+    @apply mt-2 w-full rounded-xl border border-line bg-white px-4 py-3.5 text-sm font-normal text-ink outline-none transition placeholder:text-stone-400 focus:border-forest focus:ring-4 focus:ring-forest/5;
   }
+  textarea { @apply resize-y; }
+  ::selection { @apply bg-forest text-white; }
+  dialog::backdrop { @apply bg-forest-dark/35 backdrop-blur-sm; }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Decorative food illustration. Layout and components use Tailwind utilities. */
+.dish-food { background: repeating-radial-gradient(ellipse at 40% 30%, #e4aa55 0 5px, #bf713b 6px 8px, #eed291 9px 13px); }
+.dish-food span { position: absolute; width: 24%; height: 18%; background: #bf633c; border: 3px solid #d58852; border-radius: 30%; transform: rotate(35deg); }
+.dish-food span:nth-child(1) { top: 14%; left: 20%; }
+.dish-food span:nth-child(2) { top: 45%; left: 56%; transform: rotate(-15deg); }
+.dish-food span:nth-child(3) { top: 65%; left: 25%; }
+.dish-food span:nth-child(4) { top: 27%; left: 54%; width: 8%; height: 18%; background: #526d3d; border: 0; }
+.dish-food span:nth-child(5) { top: 53%; left: 18%; width: 8%; height: 14%; background: #466849; border: 0; }
+.dish-food span:nth-child(6) { top: 15%; left: 55%; width: 12%; height: 6%; background: #e8a134; border: 0; }
+.dish-food span:nth-child(7) { top: 49%; left: 37%; width: 12%; height: 8%; background: #76964e; border: 0; }
+@media print {
+  body * { visibility: hidden; }
+  #print-qr, #print-qr * { visibility: visible; }
+  #print-qr { position: absolute; left: 50%; top: 20px; transform: translateX(-50%); width: 500px; box-shadow: none; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
